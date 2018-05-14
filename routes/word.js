@@ -14,17 +14,19 @@ router.post('/', (req, res) => {
   let { name, marks, wordsDBTypeID, wordsCategoryID } = req.body
   if (!name || !marks )
     return res.status(400).json({ message: 'param error'})
-  if (!wordsDBTypeID || !Array.isArray(wordsDBTypeID))
-    return res.status(400).json({ message: 'param error'})
-  if (!wordsCategoryID || !Array.isArray(wordsCategoryID))
-    return res.status(400).json({ message: 'param error'})
+  // if (!wordsDBTypeID || !Array.isArray(wordsDBTypeID))
+  //   return res.status(400).json({ message: 'param error'})
+  // if (!wordsCategoryID || !Array.isArray(wordsCategoryID))
+  //   return res.status(400).json({ message: 'param error'})
 
   let Word = AV.Object.extend('ContrabandWordsInfo')
+  
+  let typeArr = [], categoryArr = []
 
-  let typeArr = wordsDBTypeID.map(item => 
+  if (wordsDBTypeID.length) typeArr = wordsDBTypeID.map(item => 
     AV.Object.createWithoutData('WordsDBTypeInfo', item))
 
-  let categoryArr = wordsCategoryID.map(item => 
+    if (wordsCategoryID.length) categoryArr = wordsCategoryID.map(item => 
     AV.Object.createWithoutData('WordsCategoryInfo', item))
 
   let word = new Word()
