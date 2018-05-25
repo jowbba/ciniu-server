@@ -28,7 +28,7 @@ router.post('/', (req, res) => {
   try {
     let { name, marks, code } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ message: 'name error' })
-    if (!marks || typeof marks !== 'string') return res.status(400).json({ message: 'marks error' })
+    // if (!marks || typeof marks !== 'string') return res.status(400).json({ message: 'marks error' })
     if (!code || typeof code !== 'number') return res.status(400).json({ message: 'code error' })
 
     let Word = AV.Object.extend('ContrabandWordsInfo')
