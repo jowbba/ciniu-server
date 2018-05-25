@@ -28,16 +28,17 @@ router.get('/', (req, res) => {
 // 创建type
 router.post('/', (req, res) => {
   try {
-    let { name, version, code } = req.body
+    let { name, version, code, publishtime } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ message: 'name error' })
     if (!version || typeof version !== 'number') return res.status(400).json({ message: 'version error' })
     if (!code || typeof code !== 'number') return res.status(400).json({ message: 'code error' })
+    if (publishtime && typeof publishtime !== 'string') return res.status(400).json({ message: 'publishtime should be string'})
 
     Promise.all([getSameName(name, req), getSameCode(code, req)]).then(result => {
       if (result.find(item => item.length > 0)) return res.status(400).json({ message: 'exist same name or code' })
       let Type = AV.Object.extend('WordsDBTypeInfo')
       let type = new Type()
-      type.save({ name, version, code }, {
+      type.save({ name, version, code, publishtime }, {
         sessionToken: token(req) // 用户token
         // todo 根据条件进行存储
       }).then(result => {

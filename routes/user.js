@@ -16,6 +16,25 @@ var AV = require('leanengine')
  @param {string} password
  *  
  */
+const token = req => req.headers['x-lc-session']
+
+router.get('/', (req, res) => {
+  let count, { limit, skip } = req.query
+  let userQuery = new AV.Query('_User')
+  if (limit) userQuery.limit(limit)
+  if (skip) userQuery.skip(skip)
+  // 查询数量
+  userQuery.count({sessionToken: token(req)}).then(count => {
+    count = count
+    return userQuery.find({sessionToken: token(req)})
+    // 查询数据
+  }, err =>  res.status(err.code).json({ message: err.rawMessage })).then(result => {
+    console.log(result.length)
+    res.status(200).json({count, data: result})
+  }, err => res.status(err.code).json({ message: err.rawMessage }))
+})
+
+// 创建用户
 router.post('/', (req, res, next) => {
   let { username, password } = req.body
   if (!username) return res.status(400).json({ message: 'username error'})
@@ -51,6 +70,39 @@ router.post('/', (req, res, next) => {
     return res.status(500).json({ message: e.message})
   })
 
+})
+
+router.post('/relation', (req, res) => {
+  let { typeCode, userId } = req.body
+
+  if (!typeCode || !userId) return res.status(400).json({ message: 'params error'})
+  if (typeof typeCode !== 'number') return res.status(400).json({ message: 'typeCode should be number'})
+  if (typeof userId !== 'string') return res.status(400).json({ message: 'userId should be string'})
+
+  let typeQuery = new AV.Query('WordsDBTypeInfo')
+  typeQuery.equalTo('code', typeCode)
+
+  let userQuery = new AV.Query('_User')
+  userQuery.equalTo('objectId', userId)
+  let typeId
+  
+  // 根据code 查询
+  typeQuery.find({ sessionToken: token(req)}).then(result => {
+    if (result.length !== 1) return res.status(400).json({ message: 'typeCode is invalid'})
+    typeId = result[0].id
+    return userQuery.find({ sessionToken: token(req) })
+  }, err => res.status(400).json({ message: 'check code error'})).then(result => {
+    if (result.length !== 1) return res.status(400).json({ message: 'userId is invalid'})
+    let user = AV.Object.createWithoutData('_User', userId)
+    let wordsDBType = AV.Object.createWithoutData('WordsDBTypeInfo', typeId)
+
+    let Relation = AV.Object.extend('UserAndWordsRelationInfo')
+    let relation = new Relation()
+
+    return relation.save({ user, wordsDBType}, { sessionToken: token(req)})
+  }).then(result => {
+    res.status(200).json(result)
+  }, err => res.status(500).json({ message: err.rawMessage }))
 })
 
 module.exports = router

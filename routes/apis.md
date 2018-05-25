@@ -18,6 +18,10 @@
 > username(required) STRING
 > password(required) STRING
 
+### 创建用户词库关系 /user/relation
+#### Body(application/json)
+> typeCode(required) NUMBER
+> userId(required) STRING
 ___
 
 ## 词库分类API
@@ -143,3 +147,12 @@ ___
 ### 删除词 DELETE /word/:id
 #### Header
 > X-LC-Session
+
+
+### 创建词关系 POST /word/relation
+#### Header
+> X-LC-Session
+#### Body(application/json)
+> typeCode(required) NUMBER
+> wordCode(required) NUMBER
+> categoryCode(required) NUMBER
