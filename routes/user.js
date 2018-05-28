@@ -39,8 +39,44 @@ router.post('/', (req, res, next) => {
   let { username, password } = req.body
   if (!username) return res.status(400).json({ message: 'username error'})
   if (!password) return res.status(400).json({ message: 'password error'})
+
+  // 查询分类
+  let typeQuery = new AV.Query('WordsDBTypeInfo')
+  let typeArr, newUser
+  typeQuery.find().then(types => {
+    typeArr = types.map( item => item.id)
+    // 设置用户信息
+    let user = new AV.User()
+    user.setUsername(username)
+    user.setPassword(password)
+    return user.signUp()
+  }, err => res.status(400).json({ message: 'find type error' }) )
+  .then(result => {
+    // console.log(result, '----------------------------------')
+    newUser = result
+    // 创建用户与词库关联关系
+    let promiseArr = []
+    typeArr.forEach(item => {
+      let Relation = AV.Object.extend('UserAndWordsRelationInfo')
+      let relation = new Relation()
+      let user = AV.Object.createWithoutData('_User', result.id)
+      let type = AV.Object.createWithoutData('WordsDBTypeInfo', item)
+      promiseArr.push(relation.save({user, type}))
+    })
+    return Promise.all(promiseArr)
+    
+  }, err => res.status(500).json({ message: err.message}))
+  .then(result => {
+    // console.log(result, '````````````````````````````````')
+    let sessionToken = newUser.getSessionToken()
+    res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken}))
+  }, err => res.status(500).json({ message: err.message}))
   
-  let role, newUser
+
+  
+
+  return
+  // let role, newUser
   
   var query = new AV.Query(AV.Role)
   query.equalTo('name', 'Common')
@@ -65,10 +101,12 @@ router.post('/', (req, res, next) => {
   }).then( result => {
     // 添加用户角色成功
     let sessionToken = newUser.getSessionToken()
-    return res.status(200).json({info: Object.assign({}, newUser, {sessionToken})})
+    return res.status(200).json({info: newUser})
   }).catch(e => {
     return res.status(500).json({ message: e.message})
   })
+
+
 
 })
 

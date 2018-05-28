@@ -49,15 +49,13 @@ router.post('/', (req, res) => {
 
 // 创建词关系
 router.post('/relation', (req, res) => {
-  // AV.User.become(req.headers['x-lc-session']).then( user => {
-  //   console.log(user)
-  // })
+  
   let { typeCode, wordCode, categoryCode } = req.body
   if (!typeCode || !wordCode || !categoryCode) return res.status(400).json({ message: 'params error'})
   if (typeof typeCode !== 'number') return res.status(400).json({ message: 'typeCode should be number'})
   if (typeof wordCode !== 'number') return res.status(400).json({ message: 'wordCode should be number'})
   if (typeof categoryCode !== 'number') return res.status(400).json({ message: 'categoryCode should be number'})
-
+  
   let c = { sessionToken: token(req) }
 
   let typeQuery = new AV.Query('WordsDBTypeInfo')
@@ -106,6 +104,16 @@ router.post('/relation', (req, res) => {
 
 })
 
+// 查询词关系
+router.get('/relation', (req, res) => {
+  let { code } = req.query
+  let query = new AV.Query('WordsRelationInfo')
+  query.include(['wordsDBType'])
+  query.find().then(data => {
+    res.status(200).json(data)
+  })
+})
+
 // 删除词
 router.delete('/:id', (req, res) => {
   let type = AV.Object.createWithoutData('ContrabandWordsInfo', req.params.id)
@@ -145,16 +153,93 @@ router.patch('/:id', (req, res) => {
 
 // 查询词
 router.get('/', (req, res) => {
-  let count, { limit, skip } = req.query
-  let query = new AV.Query('ContrabandWordsInfo')
-  query.count({sessionToken: token(req)}).then(result => {
-    count = result
-    if (limit) query.limit(limit)
-    if (skip) query.skip(skip)
-    return query.find({sessionToken: token(req)})
-  }).then(result => {
-    res.status(200).json({count, data: result})
-  }, error => res.status(err.code).json({ message: err.rawMessage }))
+  let userId, typeArr, conditionQuery
+  // 查询用户id
+  AV.User.become(req.headers['x-lc-session']).then( user => {
+    userId = user.id
+    // 查询用户对应词库
+    let userToQuery = AV.Object.createWithoutData('_User', userId)
+    let query = new AV.Query('UserAndWordsRelationInfo')
+    query.equalTo('user', userToQuery)
+    return query.find()
+  }, err => res.status(404).json({ message: err.message}))
+  .then(types => {
+    if (types.length == 0) return res.status(403).json({ message: 'word is not available'})
+    // 查询词条件
+    typeArr = types.map(item => {
+      let wordQuery = new AV.Query('WordsRelationInfo')
+      let typeObj = AV.Object.createWithoutData('WordsDBTypeInfo', item.attributes.type.id)
+      wordQuery.equalTo('wordsDBType', typeObj)
+      return wordQuery
+    })
+    conditionQuery = AV.Query.or(...typeArr)
+    // 查询总数
+    return conditionQuery.count({ sessionToken: token(req) })
+  }, err => res.status(500).json({ message: err.message}))
+  .then(result => {
+    // 查询所有词
+    if (result == 0) return res.status(403).json({ message: 'word is not available'})
+    let splitArr = split(result, 100)
+    let queryArr = splitArr.map(item => {
+      conditionQuery.limit(item.limit)
+      conditionQuery.skip(item.skip)
+      conditionQuery.include('wordsDBType')
+      conditionQuery.include('contrabandWords')
+      conditionQuery.include('wordsCategory')
+      return conditionQuery.find({sessionToken: token(req)})
+    })
+    
+    return Promise.all(queryArr)
+
+  }, err => res.status(400).json({ message: err.message}))
+  .then(result => {
+    // 整合所有词
+    let words = result.reduce((total, current) => {
+      // console.log(current.)
+      return [...total, ...current]
+    }, [])
+
+    let m = new Map()
+    // console.log(words[0].attributes.contrabandWords)
+    words.forEach((item, index) => {
+      let { contrabandWords, wordsDBType, wordsCategory} = item.attributes
+      let { name, code } = contrabandWords.attributes
+      let obj = m.get(contrabandWords.attributes.code)
+      if (obj) {
+        let o = Object.assign({}, obj)
+        let sameType = o.type.find(item => item.code == wordsDBType.attributes.code)
+        let sameCategory = o.category.find(item => item.code == wordsCategory.attributes.code)
+        if (!sameType) {
+          o.type.push({name: wordsDBType.attributes.name, code: wordsDBType.attributes.code})
+        }
+
+        if (!sameCategory) {
+          o.category.push({name: wordsCategory.attributes.name, code: wordsCategory.attributes.code})
+        }
+        m.set(contrabandWords.attributes.code, o)
+      } else {
+        m.set(contrabandWords.attributes.code, {name, code,
+          type: [{name: wordsDBType.attributes.name, code: wordsDBType.attributes.code}],
+          category: [{name: wordsCategory.attributes.name, code: wordsCategory.attributes.code}]
+        })
+      }
+    })    
+    
+    res.status(200).json({ data: [...m.values()]})
+  }, err => res.status(400).json({ message: err.message})).catch(e => {
+    res.status(500).json(e)
+  })
+
 })
+
+const split = (count, perSize) => {
+  let arr = []
+  let position = 0
+  while(position < count) {
+    arr.push({limit: perSize, skip: position})
+    position += perSize
+  }
+  return arr
+}
 
 module.exports = router
