@@ -210,7 +210,7 @@ router.get('/', (req, res) => {
         let sameType = o.type.find(item => item.code == wordsDBType.attributes.code)
         let sameCategory = o.category.find(item => item.code == wordsCategory.attributes.code)
         if (!sameType) {
-          o.type.push({name: wordsDBType.attributes.name, code: wordsDBType.attributes.code})
+          o.type.push({name: wordsDBType.attributes.name, code: wordsDBType.attributes.code, publishtime:wordsDBType.attributes.publishtime})
         }
 
         if (!sameCategory) {
@@ -219,7 +219,7 @@ router.get('/', (req, res) => {
         m.set(contrabandWords.attributes.code, o)
       } else {
         m.set(contrabandWords.attributes.code, {name, code,
-          type: [{name: wordsDBType.attributes.name, code: wordsDBType.attributes.code}],
+          type: [{name: wordsDBType.attributes.name, code: wordsDBType.attributes.code, publishtime: wordsDBType.attributes.publishtime}],
           category: [{name: wordsCategory.attributes.name, code: wordsCategory.attributes.code}]
         })
       }

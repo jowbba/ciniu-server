@@ -36,23 +36,20 @@ router.get('/', (req, res) => {
 
 // 创建用户
 router.post('/', (req, res, next) => {
-  let { username, password } = req.body
+  let { username, password, code } = req.body
   if (!username) return res.status(400).json({ message: 'username error'})
   if (!password) return res.status(400).json({ message: 'password error'})
+  if (!code) return res.status(400).json({ message: 'code is required'})
 
   // 查询分类
   let typeQuery = new AV.Query('WordsDBTypeInfo')
   let typeArr, newUser
   typeQuery.find().then(types => {
     typeArr = types.map( item => item.id)
-    // 设置用户信息
-    let user = new AV.User()
-    user.setUsername(username)
-    user.setPassword(password)
-    return user.signUp()
+    // 注册用户
+    return AV.User.signUpOrlogInWithMobilePhone(username, code, { password })
   }, err => res.status(400).json({ message: 'find type error' }) )
   .then(result => {
-    // console.log(result, '----------------------------------')
     newUser = result
     // 创建用户与词库关联关系
     let promiseArr = []
@@ -67,47 +64,19 @@ router.post('/', (req, res, next) => {
     
   }, err => res.status(500).json({ message: err.message}))
   .then(result => {
-    // console.log(result, '````````````````````````````````')
     let sessionToken = newUser.getSessionToken()
     res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken}))
   }, err => res.status(500).json({ message: err.message}))
-  
+})
 
-  
-
-  return
-  // let role, newUser
-  
-  var query = new AV.Query(AV.Role)
-  query.equalTo('name', 'Common')
-  query.find().then(results => {
-    // 查询新用户对应角色是否存在
-    if (results.length == 1) {
-      // 新用户对应角色存在， 创建用户
-      role = results[0]
-      let user = new AV.User()
-      user.setUsername(username)
-      user.setPassword(password)
-      return user.signUp()
-    }else {
-      return res.status(403).json( { message: '新用户对应角色尚未创建，请联系管理员'})
-    }
-  }).then(user => {
-    // 创建用户成功， 将新用户添加角色
-    newUser = user
-    let relation = role.getUsers()
-    relation.add(user)
-    return role.save()
-  }).then( result => {
-    // 添加用户角色成功
-    let sessionToken = newUser.getSessionToken()
-    return res.status(200).json({info: newUser})
-  }).catch(e => {
-    return res.status(500).json({ message: e.message})
+router.post('/code', (req, res) => {
+  let { username } = req.body
+  if (!username) return res.status(400).json({ message: 'username is required'})
+  AV.Cloud.requestSmsCode(username).then(success => {
+    res.status(200).json({ message: 'ok'})
+  }, err => {
+    res.status(400).json({ message: err.message })
   })
-
-
-
 })
 
 router.post('/relation', (req, res) => {
