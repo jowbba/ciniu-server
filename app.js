@@ -58,6 +58,8 @@ app.use('/type', require('./routes/dbType'))
 
 app.use('/category', require('./routes/category'))
 
+app.use('/ocr', require('./routes/ocr'))
+
 
 
 app.use(function(req, res, next) {

@@ -7,28 +7,11 @@ var AV = require('leanengine')
  *
  @module Word
 */
-
-const token = req => req.headers['x-lc-session']
-
-// 查询相同name || code 的记录
-const getSameName = (name, req) => {
-  let nameQuery = new AV.Query('ContrabandWordsInfo')
-  nameQuery.equalTo('name', name)
-  return nameQuery.find({ sessionToken: token(req) })
-}
-
-const getSameCode = (code, req) => {
-  let codeQuery = new AV.Query('ContrabandWordsInfo')
-  codeQuery.equalTo('code', code)
-  return codeQuery.find({ sessionToken: token(req) })
-}
-
 // 创建词
 router.post('/', (req, res) => {
   try {
     let { name, marks, code } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ message: 'name error' })
-    // if (!marks || typeof marks !== 'string') return res.status(400).json({ message: 'marks error' })
     if (!code || typeof code !== 'number') return res.status(400).json({ message: 'code error' })
 
     let Word = AV.Object.extend('ContrabandWordsInfo')
@@ -45,81 +28,6 @@ router.post('/', (req, res) => {
     console.log(e)
     res.status(500).json(e)
   }
-})
-
-// 创建词关系
-router.post('/relation', (req, res) => {
-  
-  let { typeCode, wordCode, categoryCode } = req.body
-  if (!typeCode || !wordCode || !categoryCode) return res.status(400).json({ message: 'params error'})
-  if (typeof typeCode !== 'number') return res.status(400).json({ message: 'typeCode should be number'})
-  if (typeof wordCode !== 'number') return res.status(400).json({ message: 'wordCode should be number'})
-  if (typeof categoryCode !== 'number') return res.status(400).json({ message: 'categoryCode should be number'})
-  
-  let c = { sessionToken: token(req) }
-
-  let typeQuery = new AV.Query('WordsDBTypeInfo')
-  typeQuery.equalTo('code', typeCode)
-
-  let wordQuery = new AV.Query('ContrabandWordsInfo')
-  wordQuery.equalTo('code', wordCode)
-
-  let categoryQuery = new AV.Query('WordsCategoryInfo')
-  categoryQuery.equalTo('code', categoryCode)
-
-  let promiseArr = [typeQuery.find(c), wordQuery.find(c), categoryQuery.find(c)]
-
-  // 根据code 查询id
-  Promise.all(promiseArr).then(results => {
-
-    // 检查id
-    if (results.find(item => item.length !== 1)) return res.status(400).json({ message: 'check params error'})
-
-    let wordsDBType = AV.Object.createWithoutData('WordsDBTypeInfo', results[0][0].id)
-    let contrabandWords = AV.Object.createWithoutData('ContrabandWordsInfo', results[1][0].id)
-    let wordsCategory = AV.Object.createWithoutData('WordsCategoryInfo', results[2][0].id)
-    
-    // 查询是否存在相同关系
-    let query = new AV.Query('WordsRelationInfo')
-    query.equalTo('wordsDBType', wordsDBType)
-    query.equalTo('contrabandWords', contrabandWords)
-    query.equalTo('wordsCategory', wordsCategory)
-    
-    query.find(c).then(sameRaw => {
-      if (sameRaw.length > 0) return res.status(400).json({ message: 'exist same raw'})
-
-      let Relation = AV.Object.extend('WordsRelationInfo')
-      let relation = new Relation()
-
-      relation.save({wordsDBType, contrabandWords, wordsCategory}, c).then(result => {
-        res.status(200).json(result)
-      }, error => res.status(500).json({ message: err.rawMessage }))
-
-    })
-    
-  }).catch(e => {
-    console.log(e)
-    res.status(400).json({ message: 'check params error'})
-  })
-
-})
-
-// 查询词关系
-router.get('/relation', (req, res) => {
-  let { code } = req.query
-  let query = new AV.Query('WordsRelationInfo')
-  query.include(['wordsDBType'])
-  query.find().then(data => {
-    res.status(200).json(data)
-  })
-})
-
-// 删除词
-router.delete('/:id', (req, res) => {
-  let type = AV.Object.createWithoutData('ContrabandWordsInfo', req.params.id)
-  type.destroy({ sessionToken: token(req)}).then(result => {
-    res.status(200).json(result)
-  }, error => res.status(err.code).json({ message: err.rawMessage }))
 })
 
 // 更新词
@@ -151,6 +59,85 @@ router.patch('/:id', (req, res) => {
 
 })
 
+// 修复词关系ACL缺失
+router.patch('/', (req, res) => {
+
+})
+
+// 删除词
+router.delete('/:id', (req, res) => {
+  let type = AV.Object.createWithoutData('ContrabandWordsInfo', req.params.id)
+  type.destroy({ sessionToken: token(req)}).then(result => {
+    res.status(200).json(result)
+  }, error => res.status(err.code).json({ message: err.rawMessage }))
+})
+
+// 创建词关系
+router.post('/relation', async (req, res) => {
+  try {
+    let c = { sessionToken: token(req) }
+    let { typeCode, wordCode, categoryCode } = req.body
+    // 检查请求参数
+    if (!typeCode || !wordCode || !categoryCode) return res.status(400).json({ message: 'params error'})
+    if (typeof typeCode !== 'number') return res.status(400).json({ message: 'typeCode should be number'})
+    if (typeof wordCode !== 'number') return res.status(400).json({ message: 'wordCode should be number'})
+    if (typeof categoryCode !== 'number') return res.status(400).json({ message: 'categoryCode should be number'})
+    
+    // 检查是否存在code对应对象
+    let typeQuery = new AV.Query('WordsDBTypeInfo')
+    typeQuery.include('role')
+    typeQuery.equalTo('code', typeCode)
+
+    let wordQuery = new AV.Query('ContrabandWordsInfo')
+    wordQuery.equalTo('code', wordCode)
+
+    let categoryQuery = new AV.Query('WordsCategoryInfo')
+    categoryQuery.equalTo('code', categoryCode)
+
+    let promiseArr = [typeQuery.find(c), wordQuery.find(c), categoryQuery.find(c)]
+    let promiseResult = await Promise.all(promiseArr)
+    if (promiseResult.find(item => item.length !== 1)) return res.status(400).json({ message: 'check params error'})
+
+    // 创建code 对应对象
+    let wordsDBType = AV.Object.createWithoutData('WordsDBTypeInfo', promiseResult[0][0].id)
+    let contrabandWords = AV.Object.createWithoutData('ContrabandWordsInfo', promiseResult[1][0].id)
+    let wordsCategory = AV.Object.createWithoutData('WordsCategoryInfo', promiseResult[2][0].id)
+    
+    // 查询是否存在相同关系
+    let sameRelationQuery  = new AV.Query('WordsRelationInfo')
+    sameRelationQuery.equalTo('wordsDBType', wordsDBType)
+    sameRelationQuery.equalTo('contrabandWords', contrabandWords)
+    sameRelationQuery.equalTo('wordsCategory', wordsCategory)
+
+    let sameRaw = await sameRelationQuery.find(c)
+    if (sameRaw.length > 0) return res.status(400).json({ message: 'exist same raw'})
+
+    // type 对应角色查询
+    let roleName = JSON.parse(JSON.stringify(promiseResult[0][0])).role.name
+    let roleQuery = new AV.Query(AV.Role)
+    roleQuery.equalTo('name', roleName)
+    let roleQueryResult = await roleQuery.first(c)
+    if (!roleQueryResult) res.status(403).json({ message: '关系中type类目对应的角色还没创建，数据库存在错误，请修复'})
+
+    // acl
+    let acl = new AV.ACL()
+    acl.setRoleReadAccess(roleName, true)
+    
+    // 创建关系对象
+    let Relation = AV.Object.extend('WordsRelationInfo')
+    let relation = new Relation()
+    relation.setACL(acl)
+    let options = { wordsDBType, contrabandWords, wordsCategory }
+    
+
+    let newRelation = await relation.save(options, c)
+
+    res.status(200).json(newRelation)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
 // 查询词
 router.get('/', (req, res) => {
   let userId, typeArr, conditionQuery
@@ -161,8 +148,9 @@ router.get('/', (req, res) => {
     let userToQuery = AV.Object.createWithoutData('_User', userId)
     let query = new AV.Query('UserAndWordsRelationInfo')
     query.equalTo('user', userToQuery)
-    return query.find()
-  }, err => res.status(404).json({ message: err.message}))
+    return query.find({ sessionToken: token(req) })
+
+  }, err => res.status(404).json({ message: err.rawMessage}))
   .then(types => {
     if (types.length == 0) return res.status(403).json({ message: 'word is not available'})
     // 查询词条件
@@ -175,7 +163,8 @@ router.get('/', (req, res) => {
     conditionQuery = AV.Query.or(...typeArr)
     // 查询总数
     return conditionQuery.count({ sessionToken: token(req) })
-  }, err => res.status(500).json({ message: err.message}))
+
+  }, err => res.status(500).json({ message: err.rawMessage}))
   .then(result => {
     // 查询所有词
     if (result == 0) return res.status(403).json({ message: 'word is not available'})
@@ -188,49 +177,59 @@ router.get('/', (req, res) => {
       conditionQuery.include('wordsCategory')
       return conditionQuery.find({sessionToken: token(req)})
     })
-    
+
     return Promise.all(queryArr)
 
-  }, err => res.status(400).json({ message: err.message}))
+  }, err => res.status(400).json({ message: err.rawMessage}))
   .then(result => {
     // 整合所有词
-    let words = result.reduce((total, current) => {
-      // console.log(current.)
+    let m = new Map()
+    let relations = result.reduce((total, current) => {
       return [...total, ...current]
     }, [])
 
-    let m = new Map()
-    // console.log(words[0].attributes.contrabandWords)
-    words.forEach((item, index) => {
-      let { contrabandWords, wordsDBType, wordsCategory} = item.attributes
-      let { name, code } = contrabandWords.attributes
-      let obj = m.get(contrabandWords.attributes.code)
+    relations = JSON.parse(JSON.stringify(relations))
+
+    relations.forEach((relation, index) => {
+      let { contrabandWords, wordsDBType, wordsCategory } = relation
+      let { name, code } = contrabandWords
+      let obj = m.get(code)
+      let typeObj = getTypeObj(wordsDBType)
+      let categoryObj = getCategoryObj(wordsCategory)
       if (obj) {
         let o = Object.assign({}, obj)
-        let sameType = o.type.find(item => item.code == wordsDBType.attributes.code)
-        let sameCategory = o.category.find(item => item.code == wordsCategory.attributes.code)
-        if (!sameType) {
-          o.type.push({name: wordsDBType.attributes.name, code: wordsDBType.attributes.code, publishtime:wordsDBType.attributes.publishtime})
-        }
-
-        if (!sameCategory) {
-          o.category.push({name: wordsCategory.attributes.name, code: wordsCategory.attributes.code})
-        }
-        m.set(contrabandWords.attributes.code, o)
+        let sameType = o.type.find(item => item.code == wordsDBType.code)
+        let sameCategory = o.category.find(item => item.code == wordsCategory.code)
+        
+        if (!sameType) o.type.push(typeObj)
+        if (!sameCategory) o.category.push(categoryObj)
+        
+        m.set(contrabandWords.code, o)
       } else {
-        m.set(contrabandWords.attributes.code, {name, code,
-          type: [{name: wordsDBType.attributes.name, code: wordsDBType.attributes.code, publishtime: wordsDBType.attributes.publishtime}],
-          category: [{name: wordsCategory.attributes.name, code: wordsCategory.attributes.code}]
-        })
+        m.set(code, { name, code, type: [ typeObj ], category: [ categoryObj ] })
       }
-    })    
-    
+    })
+
     res.status(200).json({ data: [...m.values()]})
-  }, err => res.status(400).json({ message: err.message})).catch(e => {
-    res.status(500).json(e)
-  })
+  }, err => res.status(400).json({ message: err.rawMessage}))
+  .catch(err => { res.status(500).json({ message: err.message}) })
 
 })
+
+const token = req => req.headers['x-lc-session']
+
+// 查询相同name || code 的记录
+const getSameName = (name, req) => {
+  let nameQuery = new AV.Query('ContrabandWordsInfo')
+  nameQuery.equalTo('name', name)
+  return nameQuery.find({ sessionToken: token(req) })
+}
+
+const getSameCode = (code, req) => {
+  let codeQuery = new AV.Query('ContrabandWordsInfo')
+  codeQuery.equalTo('code', code)
+  return codeQuery.find({ sessionToken: token(req) })
+}
 
 const split = (count, perSize) => {
   let arr = []
@@ -241,5 +240,21 @@ const split = (count, perSize) => {
   }
   return arr
 }
+
+const getTypeObj = wordsDBType => {
+  return {
+    name: wordsDBType.name, 
+    code: wordsDBType.code, 
+    publishtime: wordsDBType.publishtime
+  }
+}
+
+const getCategoryObj = wordsCategory => {
+  return {
+    name: wordsCategory.name,
+    code: wordsCategory.code
+  }
+}
+
 
 module.exports = router

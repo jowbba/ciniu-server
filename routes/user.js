@@ -18,18 +18,19 @@ var AV = require('leanengine')
  */
 const token = req => req.headers['x-lc-session']
 
+// 查询所有用户， 管理员可用
 router.get('/', (req, res) => {
   let count, { limit, skip } = req.query
   let userQuery = new AV.Query('_User')
+  let countQuery = new AV.Query('_User')
   if (limit) userQuery.limit(limit)
   if (skip) userQuery.skip(skip)
   // 查询数量
-  userQuery.count({sessionToken: token(req)}).then(count => {
-    count = count
+  countQuery.count({sessionToken: token(req)}).then(result => {
+    count = result
     return userQuery.find({sessionToken: token(req)})
     // 查询数据
   }, err =>  res.status(err.code).json({ message: err.rawMessage })).then(result => {
-    console.log(result.length)
     res.status(200).json({count, data: result})
   }, err => res.status(err.code).json({ message: err.rawMessage }))
 })
@@ -62,13 +63,17 @@ router.post('/', (req, res, next) => {
     })
     return Promise.all(promiseArr)
     
-  }, err => res.status(500).json({ message: err.message}))
+  }, err => {
+    console.log(err)
+    res.status(500).json({ message: err.message})
+  })
   .then(result => {
     let sessionToken = newUser.getSessionToken()
     res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken}))
   }, err => res.status(500).json({ message: err.message}))
 })
 
+// 注册验证码
 router.post('/code', (req, res) => {
   let { username } = req.body
   if (!username) return res.status(400).json({ message: 'username is required'})
@@ -78,6 +83,29 @@ router.post('/code', (req, res) => {
     res.status(400).json({ message: err.message })
   })
 })
+
+router.post('/pwdcode', (req, res) => {
+  let { username } = req.body
+  if (!username) return res.status(400).json({ message: 'username is required'})
+  AV.User.requestPasswordResetBySmsCode(username).then(success => {
+    res.status(200).json({ message: 'ok'})
+  }, err => {
+    res.status(400).json({ message: err.message })
+  })
+})
+
+router.post('/password', (req, res) => {
+  let { password, code } = req.body
+  // if (!username) return res.status(400).json({ message: 'username error'})
+  if (!password) return res.status(400).json({ message: 'password error'})
+  if (!code) return res.status(400).json({ message: 'code is required'})
+
+  AV.User.resetPasswordBySmsCode(code, password).then(success => {
+    res.status(200).json(success)
+  }, err => res.status(400).json({ message: err.message}))
+})
+
+
 
 router.post('/relation', (req, res) => {
   let { typeCode, userId } = req.body

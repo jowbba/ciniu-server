@@ -24,8 +24,7 @@ router.post('/', (req, res) => {
   if (!username) return res.status(400).json({ message: 'username error'})
   if (!password) return res.status(400).json({ message: 'password error'})
 
-  AV.User.logInWithMobilePhone(username, password).then(user => {
-    console.log(user)
+  AV.User.logIn(username, password).then(user => {
     let sessionToken = user.getSessionToken()
     res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken}))
   }, err => {
