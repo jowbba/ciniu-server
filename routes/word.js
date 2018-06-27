@@ -1,5 +1,6 @@
 var router = require('express').Router()
 var AV = require('leanengine')
+var { getAllRelations } = require('./lib')
 
 /**
  *
@@ -7,6 +8,11 @@ var AV = require('leanengine')
  *
  @module Word
 */
+
+const token = req => {
+  return { sessionToken: req.headers['x-lc-session'] }
+}
+
 // 创建词
 router.post('/', (req, res) => {
   try {
@@ -19,7 +25,7 @@ router.post('/', (req, res) => {
 
     Promise.all([getSameName(name, req), getSameCode(code, req)]).then(result => {
       if (result.find(item => item.length > 0)) return res.status(400).json({ message: 'exist same name or code' })
-      word.save({ name, marks, code }, { sessionToken: token(req)}).then(result => {
+      word.save({ name, marks, code }, token(req)).then(result => {
         res.status(200).json(result)
       }, error => res.status(500).json({ message: err.rawMessage }))
     }).catch(e => res.status(400).json({ message: 'check params error'}))
@@ -32,7 +38,7 @@ router.post('/', (req, res) => {
 
 // 更新词
 router.patch('/:id', (req, res) => {
-  let { name, marks, wordsDBTypeID, wordsCategoryID} = req.body
+  let { name, marks } = req.body
 
   if (name && typeof name !== 'string') return res.status(400).json({ message: 'name error' })
   if (marks && typeof marks !== 'string') return res.status(400).json({ message: 'marks error' })
@@ -48,7 +54,7 @@ router.patch('/:id', (req, res) => {
   Promise.all(promiseArr).then(result => {
     if (result.find(item => item.length > 0)) return res.status(400).json({ message: 'exist same name' })
 
-    word.save({}, {sessionToken: token(req)}).then(result => {
+    word.save({}, token(req)).then(result => {
       res.status(200).json(result)
     }, error => {
       console.log('error', error, error.rawMessage)
@@ -59,15 +65,10 @@ router.patch('/:id', (req, res) => {
 
 })
 
-// 修复词关系ACL缺失
-router.patch('/', (req, res) => {
-
-})
-
 // 删除词
 router.delete('/:id', (req, res) => {
   let type = AV.Object.createWithoutData('ContrabandWordsInfo', req.params.id)
-  type.destroy({ sessionToken: token(req)}).then(result => {
+  type.destroy(token(req)).then(result => {
     res.status(200).json(result)
   }, error => res.status(err.code).json({ message: err.rawMessage }))
 })
@@ -75,7 +76,7 @@ router.delete('/:id', (req, res) => {
 // 创建词关系
 router.post('/relation', async (req, res) => {
   try {
-    let c = { sessionToken: token(req) }
+    let c = token(req)
     let { typeCode, wordCode, categoryCode } = req.body
     // 检查请求参数
     if (!typeCode || !wordCode || !categoryCode) return res.status(400).json({ message: 'params error'})
@@ -113,23 +114,28 @@ router.post('/relation', async (req, res) => {
     if (sameRaw.length > 0) return res.status(400).json({ message: 'exist same raw'})
 
     // type 对应角色查询
-    let roleName = JSON.parse(JSON.stringify(promiseResult[0][0])).role.name
+    let type = JSON.parse(JSON.stringify(promiseResult[0][0]))
+    if (!type.role.name) res.status(400).json({message: 'type role has not been created'})
+    let typeRoleName = type.role.name
     let roleQuery = new AV.Query(AV.Role)
-    roleQuery.equalTo('name', roleName)
+    roleQuery.equalTo('name', typeRoleName)
     let roleQueryResult = await roleQuery.first(c)
     if (!roleQueryResult) res.status(403).json({ message: '关系中type类目对应的角色还没创建，数据库存在错误，请修复'})
 
     // acl
     let acl = new AV.ACL()
-    acl.setRoleReadAccess(roleName, true)
+    acl.setRoleReadAccess(typeRoleName, true)
+    acl.setRoleReadAccess('Manager', true)
+    acl.setRoleWriteAccess('Manager', true)
+    acl.setRoleReadAccess('Vip', true)
+    acl.setRoleWriteAccess('Vip', true)
     
     // 创建关系对象
     let Relation = AV.Object.extend('WordsRelationInfo')
     let relation = new Relation()
     relation.setACL(acl)
-    let options = { wordsDBType, contrabandWords, wordsCategory }
-    
 
+    let options = { wordsDBType, contrabandWords, wordsCategory }
     let newRelation = await relation.save(options, c)
 
     res.status(200).json(newRelation)
@@ -138,8 +144,52 @@ router.post('/relation', async (req, res) => {
   }
 })
 
+// 修复词关系ACL缺失
+router.patch('/', async (req, res) => {
+  try {
+    // 查询所有词关系
+    let relations = await getAllRelations(req, res)
+    let successCount = 0
+    let failedCount = 0
+
+    for(let i = 0; i < relations.length; i++ ) {
+      let relation = relations[i]
+      let obj = AV.Object.createWithoutData('WordsRelationInfo', relation.objectId)
+      let roleToObject = relation.wordsDBType.role
+      if (!roleToObject) {
+        failedCount++
+        continue;
+      }
+      let acl = new AV.ACL()
+      acl.setRoleReadAccess(roleToObject.name, true)
+      acl.setRoleReadAccess('Manager', true)
+      acl.setRoleWriteAccess('Manager', true)
+      acl.setRoleReadAccess('Vip', true)
+      acl.setRoleWriteAccess('Vip', true)
+
+      obj.setACL(acl)
+      try {
+        await obj.save({}, token(req))
+      } catch (e) {
+        failedCount++
+        continue
+      }
+
+      successCount++
+      console.log('after adjust', successCount, failedCount)
+    }
+
+    res.status(200).json({ successCount, failedCount })
+
+    // res.status(200).json({})
+  } catch (e) {
+    res.status(500).json({ message: e.message })
+  }
+  
+})
+
 // 查询词
-router.get('/', (req, res) => {
+router.get('/2', (req, res) => {
   let userId, typeArr, conditionQuery
   // 查询用户id
   AV.User.become(req.headers['x-lc-session']).then( user => {
@@ -148,10 +198,11 @@ router.get('/', (req, res) => {
     let userToQuery = AV.Object.createWithoutData('_User', userId)
     let query = new AV.Query('UserAndWordsRelationInfo')
     query.equalTo('user', userToQuery)
-    return query.find({ sessionToken: token(req) })
+    return query.find(token(req))
 
   }, err => res.status(404).json({ message: err.rawMessage}))
   .then(types => {
+    console.log()
     if (types.length == 0) return res.status(403).json({ message: 'word is not available'})
     // 查询词条件
     typeArr = types.map(item => {
@@ -162,7 +213,7 @@ router.get('/', (req, res) => {
     })
     conditionQuery = AV.Query.or(...typeArr)
     // 查询总数
-    return conditionQuery.count({ sessionToken: token(req) })
+    return conditionQuery.count(token(req))
 
   }, err => res.status(500).json({ message: err.rawMessage}))
   .then(result => {
@@ -175,7 +226,8 @@ router.get('/', (req, res) => {
       conditionQuery.include('wordsDBType')
       conditionQuery.include('contrabandWords')
       conditionQuery.include('wordsCategory')
-      return conditionQuery.find({sessionToken: token(req)})
+      conditionQuery.descending('createdAt')
+      return conditionQuery.find(token(req))
     })
 
     return Promise.all(queryArr)
@@ -216,19 +268,58 @@ router.get('/', (req, res) => {
 
 })
 
-const token = req => req.headers['x-lc-session']
+// 查询词2
+router.get('/', async (req, res) => {
+  try {
+    // 查询用户角色
+    let user = await AV.User.become(req.headers['x-lc-session'])
+    let roles = await user.getRoles({useMasterKey: true})
+    if (roles.length == 0) return res.status(403).json({ message: 'word is not available'})
+
+    // 查询词关系
+    let relations = await getAllRelations(req, res)
+    
+    // 整合所有词
+    let m = new Map()
+    relations.forEach((relation, index) => {
+      let { contrabandWords, wordsDBType, wordsCategory } = relation
+      let { name, code } = contrabandWords
+      let obj = m.get(code)
+      let typeObj = getTypeObj(wordsDBType)
+      let categoryObj = getCategoryObj(wordsCategory)
+      if (obj) {
+        let o = Object.assign({}, obj)
+        let sameType = o.type.find(item => item.code == wordsDBType.code)
+        let sameCategory = o.category.find(item => item.code == wordsCategory.code)
+        
+        if (!sameType) o.type.push(typeObj)
+        if (!sameCategory) o.category.push(categoryObj)
+        
+        m.set(contrabandWords.code, o)
+      } else {
+        m.set(code, { name, code, type: [ typeObj ], category: [ categoryObj ] })
+      }
+    })
+    
+    res.status(200).json({ data: [...m.values()]})
+    // res.status(200).json({})
+  } catch (e) {
+    res.status(500).json({ message: e.message })
+  }
+  
+})
 
 // 查询相同name || code 的记录
 const getSameName = (name, req) => {
   let nameQuery = new AV.Query('ContrabandWordsInfo')
   nameQuery.equalTo('name', name)
-  return nameQuery.find({ sessionToken: token(req) })
+  return nameQuery.find(token(req))
 }
 
 const getSameCode = (code, req) => {
   let codeQuery = new AV.Query('ContrabandWordsInfo')
   codeQuery.equalTo('code', code)
-  return codeQuery.find({ sessionToken: token(req) })
+  return codeQuery.find(token(req))
 }
 
 const split = (count, perSize) => {

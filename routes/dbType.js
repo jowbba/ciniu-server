@@ -26,8 +26,9 @@ const queryRoleOfType = (code, req) => {
 }
 
 // 创建词库对应角色
-const createRoleOfType = (name, req) => {
+const createRoleOfType = (name, name1, req) => {
   let newRole = new AV.Role(name, createAcl())
+  newRole.set('typeName', name1)
   return newRole.save({}, token(req))
 }
 
@@ -69,7 +70,7 @@ router.post('/', async (req, res) => {
     
     // 角色不存在则创建
     if (roleResult[0]) role = roleResult[0]
-    else role = await createRoleOfType(newName, req)
+    else role = await createRoleOfType(newName, name, req)
     
     // 创建分类 
     // todo 为分类添加ACL控制
@@ -101,7 +102,7 @@ router.patch('/', async (req, res) => {
       let roleResult = await queryRoleOfType(newName, req)
       let type = AV.Object.createWithoutData('WordsDBTypeInfo', needToFixArr[i].objectId)
       // 获取角色
-      if (roleResult.length == 0) role = await createRoleOfType(newName, req) 
+      if (roleResult.length == 0) role = await createRoleOfType(newName, name, req) 
       else role = roleResult[0]
       // 更新
       type.set('role', role)
