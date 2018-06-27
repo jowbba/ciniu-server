@@ -9,6 +9,7 @@
     "dev": "nodemon server.js -- "
   },
   "dependencies": {
+    "alipay-sdk": "^3.0.1",
     "baidu-aip-sdk": "^2.3.1",
     "body-parser": "1.12.3",
     "connect-timeout": "^1.7.0",

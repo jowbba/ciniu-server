@@ -60,6 +60,8 @@ app.use('/category', require('./routes/category'))
 
 app.use('/ocr', require('./routes/ocr'))
 
+app.use('/pay', require('./routes/pay'))
+
 
 
 app.use(function(req, res, next) {
