@@ -19,18 +19,29 @@ var AV = require('leanengine')
  @param {string} password
  */
 
-router.post('/', (req, res) => {
-  let { username, password } = req.body
-  if (!username) return res.status(400).json({ message: 'username error'})
-  if (!password) return res.status(400).json({ message: 'password error'})
+router.post('/', async (req, res) => {
+  try {
+    let { username, password } = req.body
+    if (!username) return res.status(400).json({ message: 'username error'})
+    if (!password) return res.status(400).json({ message: 'password error'})
+    let user = await AV.User.logIn(username, password)
+  
+    let { point } = user.attributes
+    let count = Math.floor(point / 4)
+    let recordQuery = new AV.Query('RoleRecord')
+    recordQuery.equalTo('username', user.attributes.username)
+    recordQuery.equalTo('active', true)
+    let roles = await recordQuery.find({useMasterKey: true})
 
-  AV.User.logIn(username, password).then(user => {
+
     let sessionToken = user.getSessionToken()
-    res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken}))
-  }, err => {
-    console.log(err.message)
-    res.status(401).json(err)
-  })
+    res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, point, roles, count}))  
+  } catch (e) {
+    res.status(e.code? e.code: 500).json({ message: e.message })
+  }
+
+  
+  
 })
 
 

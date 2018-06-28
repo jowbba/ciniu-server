@@ -13,7 +13,7 @@ var client = new AipOcrClient(APP_ID, API_KEY, SECRET_KEY)
 router.post('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
-    if (user.attributes.point < 4) throw createErr('point is not enough', 403)
+    if (user.attributes.points < 4) throw createErr('points is not enough', 403)
     let { image, recognize_granularity, vertexes_location } = req.body
     let options = {}
     if (!image) throw createErr('image is required', 400)
@@ -31,9 +31,9 @@ router.post('/', async (req, res) => {
 
     let result = await client.accurate(image, options)
 
-    user.increment('point', -4)
+    user.increment('points', -4)
     await user.save(null, {
-      query: new AV.Query(AV.User).greaterThanOrEqualTo('point', 4),
+      query: new AV.Query(AV.User).greaterThanOrEqualTo('points', 4),
       useMasterKey: true
     })
 

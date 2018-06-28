@@ -6,39 +6,39 @@ var AlipaySdk = require('alipay-sdk').default
 var AlipayFormData = require('alipay-sdk/lib/form').default
 var { getAllRelations } = require('./lib')
 
-const appId = '2016091300504560'
-const privateKey = fs.readFileSync(path.join(__dirname, '../RSA2/2.txt'), 'ascii')
-const alipayPublicKey = fs.readFileSync(path.join(__dirname, '../RSA2/publicKey.txt'), 'ascii')
+const Alipay = require('alipay-node-sdk');
+
+const appId = '2016091400507187'
+// const privateKey = fs.readFileSync(path.join(__dirname, '../RSA密钥/应用私钥2048.txt'), 'utf-8')
+// const alipayPublicKey = fs.readFileSync(path.join(__dirname, '../RSA密钥/支付宝公钥.txt'), 'utf-8')
 const gateway = 'https://openapi.alipaydev.com/gateway.do'
-const AlipaySdkConfig = { appId, privateKey, alipayPublicKey, gateway }
+// const AlipaySdkConfig = { appId, privateKey, alipayPublicKey, gateway }
+// const alipaySdk = new AlipaySdk(AlipaySdkConfig);
 
-
-const alipaySdk = new AlipaySdk(AlipaySdkConfig);
-console.log(alipaySdk)
+var ali = new Alipay({
+  appId: '2016091400507187',
+  notifyUrl: 'http://ciniu.leanapp.cn/pay/notify',
+  rsaPrivate: path.join(__dirname, './RSA/2.txt'),
+  rsaPublic: path.join(__dirname, './RSA/3.txt'),
+  sandbox: true,
+  signType: 'RSA2'
+});
 
 router.post('/', async (req, res) => {
   try {
-    let formData = new AlipayFormData()
-    formData.setMethod('get');
+    var params = ali.pagePay({
+      subject: '测试商品',
+      body: '测试商品描述',
+      outTradeId: '123abcdeFa',
+      timeout: '10m',
+      amount: '10.00',
+      goodsType: '0',
+      qrPayMode: 2
+  });
+  
+  let url = gateway + '?' + params
 
-formData.addField('notifyUrl', 'http://www.com/notify');
-formData.addField('bizContent', {
-  out_trade_no: 'out_trade_no',
-  product_code: 'FAST_INSTANT_TRADE_PAY',
-  totalAmount: '0.01',
-  subject: '支付测试',
-  body: '支付测试',
-});
-
-
-const result = alipaySdk.exec(
-  'alipay.offline.material.image.upload', {}, {
-    formData: formData,
-  },
-);
-
-// result 为可以跳转到支付链接的 url
-console.log(result);
+  res.status(200).json({ url })
   } catch (e) {
     console.log(e)
   }
@@ -46,8 +46,13 @@ console.log(result);
 })
 
 router.post('/notify', (req, res) => {
-  console.log('in notify')
+  console.log('in notify', req.body)
+  let { out_trade_no } = req.body
 })
+
+const createTrade = () => {
+  
+}
 
 
 

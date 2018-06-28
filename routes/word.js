@@ -304,6 +304,7 @@ router.get('/', async (req, res) => {
     res.status(200).json({ data: [...m.values()]})
     // res.status(200).json({})
   } catch (e) {
+    console.log(e)
     res.status(500).json({ message: e.message })
   }
   

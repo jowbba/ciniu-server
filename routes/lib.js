@@ -63,3 +63,17 @@ module.exports = {
       return relations
   }
 }
+
+const token = req => {
+  return { sessionToken: req.headers['x-lc-session'] }
+}
+
+const split = (count, perSize) => {
+  let arr = []
+  let position = 0
+  while(position < count) {
+    arr.push({limit: perSize, skip: position})
+    position += perSize
+  }
+  return arr
+}

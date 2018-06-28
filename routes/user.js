@@ -10,7 +10,7 @@ const token = req => {
 }
 
 // 查询所有用户， 管理员可用
-router.get('/', (req, res) => {
+router.get('/all', (req, res) => {
   let count, { limit, skip } = req.query
   let userQuery = new AV.Query('_User')
   let countQuery = new AV.Query('_User')
@@ -50,7 +50,7 @@ router.post('/', (req, res, next) => {
   typeQuery.find().then(types => {
     typeArr = types.map( item => item.id)
     // 注册用户
-    return AV.User.signUpOrlogInWithMobilePhone(username, code, { password })
+    return AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
   }, err => res.status(400).json({ message: 'find type error' }) )
   .then(result => {
     newUser = result
@@ -131,17 +131,23 @@ router.post('/relation', (req, res) => {
   }, err => res.status(500).json({ message: err.rawMessage }))
 })
 
+
+
 // 查询用户角色
-router.get('/role', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
-    let roles = await user.getRoles()
-    res.status(200).json(roles)
+    let { point, username } = user.attributes
+    let count = Math.floor(point / 4)
+    let recordQuery = new AV.Query('RoleRecord')
+    recordQuery.equalTo('username', username)
+    recordQuery.equalTo('active', true)
+    let roles = await recordQuery.find({useMasterKey: true})
+    res.status(200).json({point, roles, count})
   } catch (e) {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
 })
-
 
 // 给用户添加角色
 router.post('/role', async (req, res) => {
@@ -206,9 +212,9 @@ router.post('/role', async (req, res) => {
 })
 
 // 给用户添加点数
-router.post('/point', async (req, res) => {
+router.post('/points', async (req, res) => {
   try {
-    let { username, point } = req.body
+    let { username, points } = req.body
     // 检查操作者
     let operationUser = await AV.User.become(req.headers['x-lc-session'])
     let operationUserRoles = J(await operationUser.getRoles())
@@ -216,12 +222,12 @@ router.post('/point', async (req, res) => {
     if (!isManager) throw new Error("user don't have access to api")
 
     // 检查point
-    if (typeof point !== 'number' || point <= 0) throw new Error('point should be number and grater than 0')
+    if (typeof points !== 'number' || points <= 0) throw new Error('points should be number and grater than 0')
     let user = await getUserWithRoot(username)
     // 检查user
     if (!user.length) return res.status(404).json({ message: 'user is not exist'})
 
-    user[0].increment('point', point)
+    user[0].increment('points', points)
     let result = await user[0].save({}, {useMasterKey: true})
     
     res.status(200).json(result)
@@ -229,8 +235,6 @@ router.post('/point', async (req, res) => {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
 })
-
-
 
 // 创建角色记录
 const createRoleRecord = async (req, username, roleName, typeName, time, mark) => {
