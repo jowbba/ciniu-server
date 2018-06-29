@@ -62,9 +62,17 @@ router.post('/notify', (req, res) => {
 
 const createTrade = (types, pointIndex) => {
   let price = 0
+  let points = 0
+  let roles = []
+  types.forEach(type => {
+    let obj = typeList
+  })
+
+
 
   if (pointIndex !== -1) {
-    let point = pointList[pointIndex]
+    points = pointList[pointIndex].count
+    price += pointList[pointIndex].price
   }
 }
 
@@ -77,7 +85,7 @@ const pointList = [
 ]
 
 const typeList = [
-  { name: '词牛违禁词软件', roleName: 'Vip', price: 1000}
+  { name: '词牛违禁词软件', roleName: 'Vip', price: 1000, days: 365}
 ]
 
 
