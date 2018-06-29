@@ -26,8 +26,8 @@ router.post('/', async (req, res) => {
     if (!password) return res.status(400).json({ message: 'password error'})
     let user = await AV.User.logIn(username, password)
   
-    let { point } = user.attributes
-    let count = Math.floor(point / 4)
+    let { points } = user.attributes
+    let count = Math.floor(points / 4)
     let recordQuery = new AV.Query('RoleRecord')
     recordQuery.equalTo('username', user.attributes.username)
     recordQuery.equalTo('active', true)
@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
 
 
     let sessionToken = user.getSessionToken()
-    res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, point, roles, count}))  
+    res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, points, roles, count}))  
   } catch (e) {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }

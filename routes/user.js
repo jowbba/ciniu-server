@@ -137,13 +137,15 @@ router.post('/relation', (req, res) => {
 router.get('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
-    let { point, username } = user.attributes
-    let count = Math.floor(point / 4)
+    let { points, username } = user.attributes
+    let count = Math.floor(points / 4)
     let recordQuery = new AV.Query('RoleRecord')
     recordQuery.equalTo('username', username)
     recordQuery.equalTo('active', true)
     let roles = await recordQuery.find({useMasterKey: true})
-    res.status(200).json({point, roles, count})
+    let vip = roles.length > 0?true: false
+    res.status(200).json({points, roles, count, vip})
+    
   } catch (e) {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
