@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
     res.status(200).json(result)
 
   } catch (e) {
-    res.status(e.code? e.code: 500).json({ message: e.message })
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
   }
 return
   

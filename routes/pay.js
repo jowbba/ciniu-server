@@ -25,68 +25,164 @@ var ali = new Alipay({
 });
 
 router.post('/', async (req, res) => {
-  
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
-    let { types, pointIndex } = this.req
+    let { types, pointIndex } = req.body
     if (!user) throw createErr('user is not login', 403)
+    if (!types || !Array.isArray(types)) throw createErr('types is required', 400)
     if (types.length == 0 && pointIndex == -1) throw createErr('pay content is empty')
-    if (!types) throw createErr('types is required', 400)
+    
     if (!pointIndex || (typeof pointIndex) !== 'number') throw createErr('pointIndex is required')
-    if (!pointList[pointIndex]) throw createErr('point type not found')
-    let { price, points, roles } = createTrade(types, pointIndex)
+    
+    let { price, points, roles, describe } = createTrade(types, pointIndex)
+    // 创建订单信息
+    let acl = new AV.ACL()
+    acl.setReadAccess(user, true)
+    acl.setRoleReadAccess('Manager', true)
+    acl.setRoleWriteAccess('Manager', true)
+    let Trade = AV.Object.extend('Trade')
+    let trade = new Trade()
+    trade.setACL(acl)
 
+    let result = await trade.save({price, points, roles, describe, status: ''}, {useMasterKey: true})
+
+    console.log(price, points, roles, describe)
     var params = ali.pagePay({
-      subject: '测试商品',
-      body: '测试商品描述',
-      outTradeId: '123abcdeFaa',
+      subject: '词牛充值',
+      body: describe,
+      outTradeId: result.id, //as out_trade_no
       timeout: '10m',
-      amount: '0.01',
+      amount: 0.01,
       goodsType: '0',
       qrPayMode: 2
   });
   
   let url = gateway + '?' + params
 
-  res.status(200).json({ url })
+  res.status(200).json({ url, result })
   } catch (e) {
-    res.status(e.code? e.code: 500).json({ message: e.message })
+    console.log(e)
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
   }
 
 })
 
-router.post('/notify', (req, res) => {
-  console.log('in notify', req.body)
-  let { out_trade_no } = req.body
+// 接收到支付宝通知
+router.post('/notify', async (req, res) => {
+  try {
+    console.log('in notify')
+    let { out_trade_no } = req.body
+    console.log(out_trade_no)
+    let queryResult = await ali.query({outTradeId:out_trade_no})
+    let ok = ali.signVerify(queryResult.json())
+    if (!ok) return res.status(200).json({message: 'bad request !@#$%^&*'})
+
+    let trade = queryResult.json().alipay_trade_query_response
+    if (trade.trade_status == 'TRADE_SUCCESS') {
+      // 
+      let result = await finishTrade(trade)
+    } else {
+      return res.status(200).json({message: 'bad request !@#$%^&*'})
+    }
+
+    console.log(queryResult.json())
+
+  // 更新交易信息
+  } catch (e) {
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  }
+})
+
+router.get('/trade', async (req, res) => {
+  try {
+    let user = await AV.User.become(req.headers['x-lc-session'])
+    let { id } = req.query
+    if (!id) throw createErr('id is required', 400)
+    // 查询当前用户订单是否存在
+    let tradeQuery = new AV.Query('Trade')
+    tradeQuery.equalTo('objectId', id)
+    let tradeQueryResult = await tradeQuery.find(token(req))
+    if (tradeQueryResult.length == 0) throw createErr('trade is not exist')
+    // 查询支付宝订单信息
+    let trade = await queryTrade(id)
+    // 处理订单
+    await dealWithTrade(trade)
+    res.status(200).json(trade)
+  } catch (e) {
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  } 
 })
 
 const createTrade = (types, pointIndex) => {
   let price = 0
   let points = 0
   let roles = []
+  let describe = ''
+  //计算会员
   types.forEach(type => {
-    let obj = typeList
+    let obj = typeList.find(item => item.roleName == type)
+    if (obj) price += obj.price
+    roles.push(obj.roleName)
+    describe += '充值会员' + obj.roleName + ' '
   })
 
-
-
-  if (pointIndex !== -1) {
+  // 计算点数
+  if (pointIndex !== -1 && pointList[pointIndex]) {
     points = pointList[pointIndex].count
     price += pointList[pointIndex].price
+    describe += '充值点数' + points
   }
+
+  return { price, points, roles, describe }
 }
 
 const pointList = [
-  {price: 50, count: '5,000'},
-  {price: 98, count: '10,000'},
-  {price: 180, count: '20,000'},
-  {price: 350, count: '40,000'},
-  {price: 1000, count: '120,000'},
+  {price: 50, count: 5000},
+  {price: 98, count: 10000},
+  {price: 180, count: 20000},
+  {price: 350, count: 40000},
+  {price: 1000, count: 120000}
 ]
 
 const typeList = [
   { name: '词牛违禁词软件', roleName: 'Vip', price: 1000, days: 365}
 ]
+
+const token = req => {
+  return { sessionToken: req.headers['x-lc-session'] }
+}
+
+// 查询订单
+const queryTrade = async id => {
+  let queryResult = await ali.query({outTradeId:id})
+  let ok = ali.signVerify(queryResult.json())
+  console.log(queryResult.json())
+  if (!ok) throw createErr('bad request !@#$%^&*', 403)
+  let trade = queryResult.json().alipay_trade_query_response
+  return trade
+}
+
+// 处理订单
+const dealWithTrade = async trade => {
+  let { out_trade_no } = trade
+
+  if (trade.code == '10000' && trade.trade_status == 'TRADE_SUCCESS') {
+    // 完成订单
+    let tradeQuery = new AV.Query('Trade')
+    tradeQuery.equalTo('objectId', out_trade_no)
+    let tradeQueryResult = await tradeQuery.find({useMasterKey: true})
+    let tradeObj = tradeQueryResult[0]
+    let { roles, points, describe } = tradeObj.attributes
+    // 添加点数
+    // 添加会员
+    console.log(tradeObj)
+  } else {
+
+  }
+  
+  let tradeObj =  AV.Object.createWithoutData('Trade', out_trade_no)
+  tradeObj
+}
 
 
 
