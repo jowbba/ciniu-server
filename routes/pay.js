@@ -4,7 +4,7 @@ var router = require('express').Router()
 var AV = require('leanengine')
 var AlipaySdk = require('alipay-sdk').default
 var AlipayFormData = require('alipay-sdk/lib/form').default
-var { getAllRelations, createErr } = require('./lib')
+var { getAllRelations, createErr, setPoints, setRoles, getUserWithRoot } = require('./lib')
 
 const Alipay = require('alipay-node-sdk');
 
@@ -27,14 +27,15 @@ var ali = new Alipay({
 router.post('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
+    let { username } = user.attributes
     let { types, pointIndex } = req.body
+    if (!types) types = []
     if (!user) throw createErr('user is not login', 403)
     if (!types || !Array.isArray(types)) throw createErr('types is required', 400)
     if (types.length == 0 && pointIndex == -1) throw createErr('pay content is empty')
+    if (!pointIndex ) throw createErr('pointIndex is required')
     
-    if (!pointIndex || (typeof pointIndex) !== 'number') throw createErr('pointIndex is required')
-    
-    let { price, points, roles, describe } = createTrade(types, pointIndex)
+    let { price, points, roles, describe, time } = createTrade(types, pointIndex)
     // 创建订单信息
     let acl = new AV.ACL()
     acl.setReadAccess(user, true)
@@ -44,9 +45,8 @@ router.post('/', async (req, res) => {
     let trade = new Trade()
     trade.setACL(acl)
 
-    let result = await trade.save({price, points, roles, describe, status: ''}, {useMasterKey: true})
+    let result = await trade.save({username, price, points, roles, describe, status: '', time}, {useMasterKey: true})
 
-    console.log(price, points, roles, describe)
     var params = ali.pagePay({
       subject: '词牛充值',
       body: describe,
@@ -96,6 +96,7 @@ router.post('/notify', async (req, res) => {
 router.get('/trade', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
+    let { username } = user.attributes
     let { id } = req.query
     if (!id) throw createErr('id is required', 400)
     // 查询当前用户订单是否存在
@@ -103,15 +104,19 @@ router.get('/trade', async (req, res) => {
     tradeQuery.equalTo('objectId', id)
     let tradeQueryResult = await tradeQuery.find(token(req))
     if (tradeQueryResult.length == 0) throw createErr('trade is not exist')
+    if (tradeQueryResult[0].attributes.status == 'TRADE_SUCCESS')
+      return res.status(200).json(trade)
     // 查询支付宝订单信息
     let trade = await queryTrade(id)
     // 处理订单
     await dealWithTrade(trade)
     res.status(200).json(trade)
   } catch (e) {
+    console.log(e)
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
   } 
 })
+
 
 const createTrade = (types, pointIndex) => {
   let price = 0
@@ -133,7 +138,7 @@ const createTrade = (types, pointIndex) => {
     describe += '充值点数' + points
   }
 
-  return { price, points, roles, describe }
+  return { price, points, roles, describe, time: 365}
 }
 
 const pointList = [
@@ -156,7 +161,7 @@ const token = req => {
 const queryTrade = async id => {
   let queryResult = await ali.query({outTradeId:id})
   let ok = ali.signVerify(queryResult.json())
-  console.log(queryResult.json())
+  // console.log(queryResult.json())
   if (!ok) throw createErr('bad request !@#$%^&*', 403)
   let trade = queryResult.json().alipay_trade_query_response
   return trade
@@ -165,17 +170,23 @@ const queryTrade = async id => {
 // 处理订单
 const dealWithTrade = async trade => {
   let { out_trade_no } = trade
-
+  // 完成订单
   if (trade.code == '10000' && trade.trade_status == 'TRADE_SUCCESS') {
-    // 完成订单
+    
     let tradeQuery = new AV.Query('Trade')
     tradeQuery.equalTo('objectId', out_trade_no)
     let tradeQueryResult = await tradeQuery.find({useMasterKey: true})
     let tradeObj = tradeQueryResult[0]
-    let { roles, points, describe } = tradeObj.attributes
+    let { username, points, roles, describe, time } = tradeObj.attributes
+    let user = await getUserWithRoot(username)
     // 添加点数
+    await setPoints(user, points)
     // 添加会员
-    console.log(tradeObj)
+    await setRoles(user, roles, time, describe)
+    // 更新订单
+    tradeObj.set('status', 'TRADE_SUCCESS')
+    await tradeObj.save({}, {useMasterKey: true})
+    
   } else {
 
   }
