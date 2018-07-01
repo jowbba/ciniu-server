@@ -1,6 +1,7 @@
 var router = require('express').Router()
 var AV = require('leanengine')
 var { getUserWithRoot, getVipRoles, getRoles } = require('./lib')
+var { createErr, setPoints, setRoles } = require('./lib')
 
 /**
  @module User 
@@ -38,41 +39,23 @@ router.post('/code', (req, res) => {
 })
 
 // 注册用户
-router.post('/', (req, res, next) => {
-  let { username, password, code } = req.body
-  if (!username) return res.status(400).json({ message: 'username error'})
-  if (!password) return res.status(400).json({ message: 'password error'})
-  if (!code) return res.status(400).json({ message: 'code is required'})
+router.post('/', async (req, res) => {
+  try {
+    let { username, password, code } = req.body
+    if (!username) return res.status(400).json({ message: 'username error'})
+    if (!password) return res.status(400).json({ message: 'password error'})
+    if (!code) return res.status(400).json({ message: 'code is required'})
 
-  // 查询分类
-  let typeQuery = new AV.Query('WordsDBTypeInfo')
-  let typeArr, newUser
-  typeQuery.find().then(types => {
-    typeArr = types.map( item => item.id)
-    // 注册用户
-    return AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
-  }, err => res.status(400).json({ message: 'find type error' }) )
-  .then(result => {
-    newUser = result
-    // 创建用户与词库关联关系
-    let promiseArr = []
-    typeArr.forEach(item => {
-      let Relation = AV.Object.extend('UserAndWordsRelationInfo')
-      let relation = new Relation()
-      let user = AV.Object.createWithoutData('_User', result.id)
-      let type = AV.Object.createWithoutData('WordsDBTypeInfo', item)
-      promiseArr.push(relation.save({user, type}))
-    })
-    return Promise.all(promiseArr)
-    
-  }, err => {
-    console.log(err)
-    res.status(500).json({ message: err.message})
-  })
-  .then(result => {
+    let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
     let sessionToken = newUser.getSessionToken()
+    // console.log(newUser) 
+    await setRoles([newUser], ['Vip'], 60, '新用户赠送60天会员')
+    await setPoints([newUser], 100)
     res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken}))
-  }, err => res.status(500).json({ message: err.message}))
+  } catch (e) {
+    console.log(e)
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  }
 })
 
 // 修改密码验证码

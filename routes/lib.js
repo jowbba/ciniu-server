@@ -91,10 +91,12 @@ module.exports = {
       if (roleRsult.length !== 0 ) roles.push(roleRsult[0])
       else throw new Error(` role name ${rolesName[i]} is not exist`)
     }
+
+    
     
     // 为用户赋予角色
     for(let i = 0; i < roles.length; i++) {
-
+      console.log(roles[i].attributes)
       // 创建角色记录
       let { oldRoleRecord, newRoleRecord } = await createRoleRecord(
         user[0].attributes.username, roles[i].attributes.name, 
