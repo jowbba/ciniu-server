@@ -48,10 +48,16 @@ router.post('/', async (req, res) => {
 
     let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
     let sessionToken = newUser.getSessionToken()
-    // console.log(newUser) 
-    await setRoles([newUser], ['Vip'], 60, '新用户赠送60天会员')
-    await setPoints([newUser], 100)
-    res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken}))
+
+    await setRoles([newUser], ['Vip'], 180, '新用户赠送60天会员')
+    // await setPoints([newUser], 100)
+
+    let recordQuery = new AV.Query('RoleRecord')
+    recordQuery.equalTo('username', username)
+    recordQuery.equalTo('active', true)
+    let roles = await recordQuery.find({useMasterKey: true})
+
+    res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken, roles}))
   } catch (e) {
     console.log(e)
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })

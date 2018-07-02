@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
     if (!username) return res.status(400).json({ message: 'username error'})
     if (!password) return res.status(400).json({ message: 'password error'})
     let user = await AV.User.logIn(username, password)
-  
+    
     let { points } = user.attributes
     let count = Math.floor(points / 4)
     let recordQuery = new AV.Query('RoleRecord')
@@ -37,7 +37,8 @@ router.post('/', async (req, res) => {
     let sessionToken = user.getSessionToken()
     res.status(200).json(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, points, roles, count}))  
   } catch (e) {
-    res.status(e.code? e.code: 500).json({ message: e.message })
+    if (e.code == 210) e.message = '用户名或密码错误'
+    res.status(e.code && e.code > 300? e.code: 500).json({ message: e.message })
   }
 
   
