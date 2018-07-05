@@ -54,7 +54,8 @@ router.post('/', async (req, res) => {
       timeout: '10m',
       amount: price,
       goodsType: '0',
-      qrPayMode: 2
+      qrPayMode: 2,
+      return_url: 'http://www.ciniuwang.com/paid'
   });
   
   let url = gateway + '?' + params
@@ -76,7 +77,7 @@ router.post('/notify', async (req, res) => {
     let queryResult = await ali.query({outTradeId:out_trade_no})
     let ok = ali.signVerify(queryResult.json())
     if (!ok) return res.status(200).json({message: 'bad request !@#$%^&*'})
-
+    else return res.status(200).json({message: 'bad request !@#$%^&*'})
     let trade = queryResult.json().alipay_trade_query_response
     if (trade.trade_status == 'TRADE_SUCCESS') {
       // 

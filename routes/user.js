@@ -42,9 +42,9 @@ router.post('/code', (req, res) => {
 router.post('/', async (req, res) => {
   try {
     let { username, password, code } = req.body
-    if (!username) return res.status(400).json({ message: 'username error'})
-    if (!password) return res.status(400).json({ message: 'password error'})
-    if (!code) return res.status(400).json({ message: 'code is required'})
+    if (!username) throw createErr('用户名不能为空', 400)
+    if (!password) throw createErr('密码不能为空', 400)
+    if (!code) throw createErr('验证码不能为空', 400)
 
     let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
     let sessionToken = newUser.getSessionToken()
@@ -59,7 +59,6 @@ router.post('/', async (req, res) => {
 
     res.status(200).json(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken, roles}))
   } catch (e) {
-    console.log(e)
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
   }
 })
@@ -119,8 +118,6 @@ router.post('/relation', (req, res) => {
     res.status(200).json(result)
   }, err => res.status(500).json({ message: err.rawMessage }))
 })
-
-
 
 // 查询用户角色
 router.get('/', async (req, res) => {
