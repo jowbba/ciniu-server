@@ -49,8 +49,8 @@ router.post('/', async (req, res) => {
     let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
     let sessionToken = newUser.getSessionToken()
 
-    await setRoles([newUser], ['Vip'], 180, '新用户赠送60天会员')
-    // await setPoints([newUser], 100)
+    // await setRoles([newUser], ['Vip'], 180, '新用户赠送60天会员')
+    await setPoints([newUser], 200)
 
     let recordQuery = new AV.Query('RoleRecord')
     recordQuery.equalTo('username', username)

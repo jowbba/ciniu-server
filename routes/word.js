@@ -114,21 +114,24 @@ router.post('/relation', async (req, res) => {
     if (sameRaw.length > 0) return res.status(400).json({ message: 'exist same raw'})
 
     // type 对应角色查询
-    let type = JSON.parse(JSON.stringify(promiseResult[0][0]))
-    if (!type.role.name) res.status(400).json({message: 'type role has not been created'})
-    let typeRoleName = type.role.name
-    let roleQuery = new AV.Query(AV.Role)
-    roleQuery.equalTo('name', typeRoleName)
-    let roleQueryResult = await roleQuery.first(c)
-    if (!roleQueryResult) res.status(403).json({ message: '关系中type类目对应的角色还没创建，数据库存在错误，请修复'})
+    // let type = JSON.parse(JSON.stringify(promiseResult[0][0]))
+    // if (!type.role.name) res.status(400).json({message: 'type role has not been created'})
+    // let typeRoleName = type.role.name
+    // let roleQuery = new AV.Query(AV.Role)
+    // roleQuery.equalTo('name', typeRoleName)
+    // let roleQueryResult = await roleQuery.first(c)
+    // if (!roleQueryResult) res.status(403).json({ message: '关系中type类目对应的角色还没创建，数据库存在错误，请修复'})
 
     // acl
     let acl = new AV.ACL()
-    acl.setRoleReadAccess(typeRoleName, true)
-    acl.setRoleReadAccess('Manager', true)
+    // acl.setRoleReadAccess(typeRoleName, true)
+    // acl.setRoleReadAccess('Manager', true)
+    // acl.setRoleWriteAccess('Manager', true)
+    // acl.setRoleReadAccess('Vip', true)
+    // acl.setRoleWriteAccess('Vip', true)
+    acl.setPublicReadAccess(true)
+    acl.setPublicWriteAccess(false)
     acl.setRoleWriteAccess('Manager', true)
-    acl.setRoleReadAccess('Vip', true)
-    acl.setRoleWriteAccess('Vip', true)
     
     // 创建关系对象
     let Relation = AV.Object.extend('WordsRelationInfo')
@@ -161,11 +164,15 @@ router.patch('/', async (req, res) => {
         continue;
       }
       let acl = new AV.ACL()
-      acl.setRoleReadAccess(roleToObject.name, true)
-      acl.setRoleReadAccess('Manager', true)
+      // acl.setRoleReadAccess(roleToObject.name, true)
+      // acl.setRoleReadAccess('Manager', true)
+      // acl.setRoleWriteAccess('Manager', true)
+      // acl.setRoleReadAccess('Vip', true)
+      // acl.setRoleWriteAccess('Vip', true)
+      acl.setPublicReadAccess(true)
+      acl.setPublicWriteAccess(false)
       acl.setRoleWriteAccess('Manager', true)
-      acl.setRoleReadAccess('Vip', true)
-      acl.setRoleWriteAccess('Vip', true)
+      
 
       obj.setACL(acl)
       try {
@@ -274,7 +281,7 @@ router.get('/', async (req, res) => {
     // 查询用户角色
     let user = await AV.User.become(req.headers['x-lc-session'])
     let roles = await user.getRoles({useMasterKey: true})
-    if (roles.length == 0) return res.status(403).json({ message: 'word is not available'})
+    // if (roles.length == 0) return res.status(403).json({ message: 'word is not available'})
 
     // 查询词关系
     let relations = await getAllRelations(req, res)
@@ -302,7 +309,6 @@ router.get('/', async (req, res) => {
     })
     
     res.status(200).json({ data: [...m.values()]})
-    // res.status(200).json({})
   } catch (e) {
     console.log(e)
     res.status(500).json({ message: e.message })
