@@ -43,7 +43,7 @@ module.exports = {
   getAllRelations: async (req, res) => {
     let relationQuery = new AV.Query('WordsRelationInfo')
     let relationCount = await relationQuery.count(token(req))
-    if (relationCount == 0) return res.status(403).json({ message: 'can not found any word belong to user' })
+    if (relationCount == 0) throw new Error('can not found any word belong to user')
     let splitArr = split(relationCount, 100)
     let queryArr = splitArr.map(item => {
       relationQuery.limit(item.limit)
@@ -92,8 +92,6 @@ module.exports = {
       else throw new Error(` role name ${rolesName[i]} is not exist`)
     }
 
-    
-    
     // 为用户赋予角色
     for(let i = 0; i < roles.length; i++) {
       console.log(roles[i].attributes)
@@ -127,8 +125,50 @@ module.exports = {
       newRoleRecord.set('active', true)
       await newRoleRecord.save(null,{useMasterKey: true})
     }
-  }
+  },
 
+  setRoles2: async (user, annualCount, describe) => {
+    let role
+    //获取role对象
+      let roleQuery = new AV.Query(AV.Role)
+      roleQuery.equalTo('name', 'Vip')
+      let roleRsult = await roleQuery.find({ useMasterKey: true })
+      
+      if (roleRsult.length !== 0 ) role = (roleRsult[0])
+      else throw new Error(` role name ${rolesName[i]} is not exist`)
+    
+
+    // 为用户赋予角色
+      // 创建角色记录
+      let { oldRoleRecord, newRoleRecord } = await createRoleRecord(
+        user[0].attributes.username, role.attributes.name, 
+        role.attributes.typeName, annualCount * 365, describe)
+
+      // 查询用户是否已拥有角色
+      let roleQuery2 = new AV.Query(AV.Role)
+      roleQuery2.equalTo('name', role.attributes.name)
+      roleQuery2.equalTo('users', user[0])
+      let roleResult = await roleQuery2.find({useMasterKey: true})
+
+      if (roleResult.length > 0) {
+        // 用户具备当前角色
+        console.log('用户具备当前角色')
+      } else {
+        // 用户不具备当前角色
+        console.log('用户不具备当前角色')
+        let relation = role.getUsers()
+        relation.add(user[0])
+        await role.save({}, {useMasterKey: true})
+      }
+
+      if (oldRoleRecord) {
+        oldRoleRecord.set('active', false)
+        await oldRoleRecord.save(null,{useMasterKey: true})
+      }
+
+      newRoleRecord.set('active', true)
+      await newRoleRecord.save(null,{useMasterKey: true})
+  }
 }
 
 const token = req => {

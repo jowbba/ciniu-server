@@ -4,16 +4,12 @@ var router = require('express').Router()
 var AV = require('leanengine')
 var AlipaySdk = require('alipay-sdk').default
 var AlipayFormData = require('alipay-sdk/lib/form').default
-var { getAllRelations, createErr, setPoints, setRoles, getUserWithRoot } = require('./lib')
+var { getAllRelations, createErr, setPoints, setRoles, setRoles2, getUserWithRoot } = require('./lib')
 
 const Alipay = require('alipay-node-sdk');
 
-const appId = '2016091400507187'
-// const privateKey = fs.readFileSync(path.join(__dirname, '../RSA密钥/应用私钥2048.txt'), 'utf-8')
-// const alipayPublicKey = fs.readFileSync(path.join(__dirname, '../RSA密钥/支付宝公钥.txt'), 'utf-8')
+
 const gateway = 'https://openapi.alipay.com/gateway.do'
-// const AlipaySdkConfig = { appId, privateKey, alipayPublicKey, gateway }
-// const alipaySdk = new AlipaySdk(AlipaySdkConfig);
 
 var ali = new Alipay({
   appId: '2018062760432332',
@@ -68,35 +64,37 @@ router.post('/', async (req, res) => {
   }
 })
 
+// 创建订单2
 router.post('/2', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
     let { username } = user.attributes
-    let { annualCount, pointIndex, invoiceClassify, invoiceType, invoiceTitle, invoiceId, address, email, name, photo, code, pay } = req.body
-
+    let { annualCount, pointIndex, invoiceClassify, invoiceType, invoiceTitle, invoiceId, address, email, name, phone, code, pay } = req.body
+    annualCount = Number(annualCount)
     // 检查参数
     if (!user) throw createErr('user is not login', 403)
     if (annualCount == 0 && pointIndex == -1) throw createErr('pay content is empty')
     if (!pointIndex ) throw createErr('pointIndex is required')
     
-    let { price, points, roles, describe, time } = createTrade(types, pointIndex)
+    let { price, points, describe } = createTrade2(annualCount, pointIndex)
     // 创建订单信息
     let acl = new AV.ACL()
     acl.setReadAccess(user, true)
     acl.setRoleReadAccess('Manager', true)
     acl.setRoleWriteAccess('Manager', true)
+
     let Trade = AV.Object.extend('Trade')
     let trade = new Trade()
     trade.setACL(acl)
 
-    let result = await trade.save({username, price, points, roles, describe, status: '', time}, {useMasterKey: true})
+    let result = await trade.save({username, price, annualCount, points, describe, status: '', invoiceClassify, invoiceType, invoiceTitle, invoiceId, address, email, name, phone, code, pay}, {useMasterKey: true})
 
     var params = ali.pagePay({
       subject: '词牛充值',
       body: describe,
       outTradeId: result.id, //as out_trade_no
       timeout: '10m',
-      amount: price,
+      amount: 0.01,
       goodsType: '0',
       qrPayMode: 2,
       return_url: 'http://www.ciniuwang.com/paid'
@@ -137,6 +135,7 @@ router.post('/notify', async (req, res) => {
   }
 })
 
+// 查询订单信息
 router.get('/trade', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
@@ -149,11 +148,11 @@ router.get('/trade', async (req, res) => {
     let tradeQueryResult = await tradeQuery.find(token(req))
     if (tradeQueryResult.length == 0) throw createErr('trade is not exist')
     if (tradeQueryResult[0].attributes.status == 'TRADE_SUCCESS')
-      return res.status(200).json(trade)
+      return res.status(200).json(tradeQueryResult[0])
     // 查询支付宝订单信息
     let trade = await queryTrade(id)
     // 处理订单
-    await dealWithTrade(trade)
+    await dealWithTrade2(trade)
     res.status(200).json(trade)
   } catch (e) {
     console.log(e)
@@ -161,7 +160,7 @@ router.get('/trade', async (req, res) => {
   } 
 })
 
-
+// 订单详情1
 const createTrade = (types, pointIndex) => {
   let price = 0
   let points = 0
@@ -185,6 +184,30 @@ const createTrade = (types, pointIndex) => {
   return { price, points, roles, describe, time: 365}
 }
 
+// 订单详情2
+const createTrade2 = (annualCount, pointIndex) => {
+  let price = 0
+  let points = 0
+  let describe = ''
+
+  if (annualCount == 0 && pointIndex == -1) throw createErr('pay for null')
+
+  // 计算会员费
+  if (annualCount > 0 ) {
+    price += 999 * annualCount
+    describe += `充值会员${annualCount}年`
+  }
+
+  // 计算点数费用
+  if(pointIndex !== -1) {
+    points = pointList[pointIndex].count
+    price += pointList[pointIndex].price
+    describe += '充值点数' + points
+  }
+
+  return  { price, points, describe }
+}
+
 const pointList = [
   {price: 50, count: 5000},
   {price: 98, count: 10000},
@@ -205,7 +228,6 @@ const token = req => {
 const queryTrade = async id => {
   let queryResult = await ali.query({outTradeId:id})
   let ok = ali.signVerify(queryResult.json())
-  // console.log(queryResult.json())
   if (!ok) throw createErr('bad request !@#$%^&*', 403)
   let trade = queryResult.json().alipay_trade_query_response
   return trade
@@ -227,6 +249,34 @@ const dealWithTrade = async trade => {
     await setPoints(user, points)
     // 添加会员
     await setRoles(user, roles, time, describe)
+    // 更新订单
+    tradeObj.set('status', 'TRADE_SUCCESS')
+    await tradeObj.save({}, {useMasterKey: true})
+    
+  } else {
+
+  }
+  
+  let tradeObj =  AV.Object.createWithoutData('Trade', out_trade_no)
+  tradeObj
+}
+
+// 处理订单
+const dealWithTrade2 = async trade => {
+  let { out_trade_no } = trade
+  // 完成订单
+  if (trade.code == '10000' && trade.trade_status == 'TRADE_SUCCESS') {
+    
+    let tradeQuery = new AV.Query('Trade')
+    tradeQuery.equalTo('objectId', out_trade_no)
+    let tradeQueryResult = await tradeQuery.find({useMasterKey: true})
+    let tradeObj = tradeQueryResult[0]
+    let { username, points, annualCount, roles, describe} = tradeObj.attributes
+    let user = await getUserWithRoot(username)
+    // 添加点数
+    await setPoints(user, points)
+    // 添加会员
+    await setRoles2(user, annualCount, describe)
     // 更新订单
     tradeObj.set('status', 'TRADE_SUCCESS')
     await tradeObj.save({}, {useMasterKey: true})

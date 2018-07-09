@@ -199,6 +199,7 @@ router.post('/role', async (req, res) => {
   }
 })
 
+
 // 给用户添加点数
 router.post('/points', async (req, res) => {
   try {
@@ -223,6 +224,8 @@ router.post('/points', async (req, res) => {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
 })
+
+// 消费点数
 
 // 创建角色记录
 const createRoleRecord = async (req, username, roleName, typeName, time, mark) => {

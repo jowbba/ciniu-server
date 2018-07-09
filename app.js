@@ -62,6 +62,8 @@ app.use('/ocr', require('./routes/ocr'))
 
 app.use('/pay', require('./routes/pay'))
 
+app.use('/version', require('./routes/version'))
+
 
 
 app.use(function(req, res, next) {

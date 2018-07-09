@@ -31,9 +31,9 @@ router.post('/', async (req, res) => {
 
     let result = await client.accurate(image, options)
 
-    user.increment('points', -6)
+    user.increment('points', -8)
     await user.save(null, {
-      query: new AV.Query(AV.User).greaterThanOrEqualTo('points', 4),
+      query: new AV.Query(AV.User).greaterThanOrEqualTo('points', 8),
       useMasterKey: true
     })
 
