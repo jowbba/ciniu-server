@@ -128,6 +128,7 @@ module.exports = {
   },
 
   setRoles2: async (user, annualCount, describe) => {
+    if (annualCount == 0) return
     let role
     //获取role对象
       let roleQuery = new AV.Query(AV.Role)

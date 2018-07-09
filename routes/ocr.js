@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
 
     user.increment('points', -8)
     await user.save(null, {
-      query: new AV.Query(AV.User).greaterThanOrEqualTo('points', 8),
+      query: new AV.Query(AV.User).greaterThanOrEqualTo('points', 1),
       useMasterKey: true
     })
 

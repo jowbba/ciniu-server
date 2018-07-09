@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
     let user = await AV.User.logIn(username, password)
     
     let { points } = user.attributes
-    let count = Math.floor(points / 4)
+    let count = Math.floor(points / 8)
     let recordQuery = new AV.Query('RoleRecord')
     recordQuery.equalTo('username', user.attributes.username)
     recordQuery.equalTo('active', true)

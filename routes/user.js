@@ -28,14 +28,20 @@ router.get('/all', (req, res) => {
 })
 
 // 注册验证码
-router.post('/code', (req, res) => {
-  let { username } = req.body
-  if (!username) return res.status(400).json({ message: 'username is required'})
-  AV.Cloud.requestSmsCode(username).then(success => {
-    res.status(200).json({ message: 'ok'})
-  }, err => {
-    res.status(400).json({ message: err.message })
-  })
+router.post('/code', async (req, res) => {
+  try {
+    let { username } = req.body
+    if (!username) return res.status(400).json({ message: 'username is required'})
+    let existUser = await getUserWithRoot(username)
+    if (existUser.length > 0) throw createErr('用户已存在', 401)
+    AV.Cloud.requestSmsCode(username).then(success => {
+      res.status(200).json({ message: 'ok'})
+    }, err => {
+      res.status(400).json({ message: err.message })
+    })
+  } catch (e) {
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  }
 })
 
 // 注册用户
@@ -45,6 +51,9 @@ router.post('/', async (req, res) => {
     if (!username) throw createErr('用户名不能为空', 400)
     if (!password) throw createErr('密码不能为空', 400)
     if (!code) throw createErr('验证码不能为空', 400)
+
+    let existUser = await getUserWithRoot(username)
+    if (existUser.length > 0) throw createErr('用户已存在', 401)
 
     let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
     let sessionToken = newUser.getSessionToken()
@@ -124,7 +133,7 @@ router.get('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
     let { points, username } = user.attributes
-    let count = Math.floor(points / 4)
+    let count = Math.floor(points / 8)
     let recordQuery = new AV.Query('RoleRecord')
     recordQuery.equalTo('username', username)
     recordQuery.equalTo('active', true)
