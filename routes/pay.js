@@ -94,7 +94,7 @@ router.post('/2', async (req, res) => {
       body: describe,
       outTradeId: result.id, //as out_trade_no
       timeout: '10m',
-      amount: 0.01,
+      amount: price,
       goodsType: '0',
       qrPayMode: 2,
       return_url: 'http://www.ciniuwang.com/paid'

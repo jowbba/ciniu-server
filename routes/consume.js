@@ -17,14 +17,11 @@ router.post('/', async (req, res) => {
     let remainder = newCountToAccont % 500
     // 整数未到500 增加待结算字数 返回
     if (integer == 0) {
-      user.increment('toAccountWords', count) 
-      await user.save({}, token(req))
+      // user.increment('toAccountWords', count) 
+      // await user.save({}, token(req))
     }
-
-    console.log(user)
-
     
-    res.status(200).json({})
+    res.status(200).json({ points, consumedPoints, toAccountWords, accountedWords })
   } catch (e) {
     console.log(e)
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
