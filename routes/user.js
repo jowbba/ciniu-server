@@ -11,20 +11,108 @@ const token = req => {
 }
 
 // 查询所有用户， 管理员可用
-router.get('/all', (req, res) => {
-  let count, { limit, skip } = req.query
-  let userQuery = new AV.Query('_User')
-  let countQuery = new AV.Query('_User')
-  if (limit) userQuery.limit(limit)
-  if (skip) userQuery.skip(skip)
-  // 查询数量
-  countQuery.count(token(req)).then(result => {
-    count = result
-    return userQuery.find(token(req))
+router.get('/all', async (req, res) => {
+  try {
+    let { limit, skip } = req.query
+    let userQuery = new AV.Query('_User')
+    let countQuery = new AV.Query('_User')
+    if (limit) userQuery.limit(limit)
+    if (skip) userQuery.skip(skip)
+    // 查询数量
+    let count = await countQuery.count(token(req))
     // 查询数据
-  }, err =>  res.status(err.code).json({ message: err.rawMessage })).then(result => {
-    res.status(200).json({count, data: result})
-  }, err => res.status(err.code).json({ message: err.rawMessage }))
+    let data = await userQuery.find(token(req))
+    res.status(200).json({count, data})
+  } catch (e) {
+    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  }
+})
+
+// 给用户添加角色
+router.post('/role', async (req, res) => {
+  try {
+    let { username, types, time, vip } = req.body
+    // 检验参数
+    if (!username) return res.status(400).json({ message: 'username is required'})
+    if (!vip && (!types || !Array.isArray(types) || types.length == 0)) 
+      return res.status(400).json({ message: 'type is required'})
+    if (!time || (typeof time) !== 'number') 
+      return res.status(400).json({ message: 'time is required'})
+
+    // 检查用户用户
+    let user = await getUserWithRoot(username)
+    if (!user.length) return res.status(404).json({ message: 'user is not exist'})
+
+    // 检查types, 获取roles
+    let roles
+    if (vip) roles = await getVipRoles(req)
+    else roles = await getRoles(types, req)
+    if (roles.length == 0 ) return res.status(403).json({message: 'can not fond role'})
+
+    // 为用户赋予角色
+    for(let i = 0; i < roles.length; i++) {
+
+      // 创建角色记录
+      let { oldRoleRecord, newRoleRecord } = await createRoleRecord(req,
+        user[0].attributes.username, roles[i].attributes.name, 
+        roles[i].attributes.typeName, time, '由管理员创建')
+
+      // 查询用户是否已拥有角色
+      let roleQuery = new AV.Query(AV.Role)
+      roleQuery.equalTo('name', roles[i].attributes.name)
+      roleQuery.equalTo('users', user[0])
+      let roleResult = await roleQuery.find(token(req))
+
+      if (roleResult.length > 0) {
+        // 用户具备当前角色
+        console.log('用户具备当前角色')
+      } else {
+        // 用户不具备当前角色
+        console.log('用户不具备当前角色')
+        let relation = roles[i].getUsers()
+        relation.add(user[0])
+        await roles[i].save({}, token(req))
+      }
+
+      if (oldRoleRecord) {
+        oldRoleRecord.set('active', false)
+        await oldRoleRecord.save(null,token(req))
+      }
+
+      newRoleRecord.set('active', true)
+      await newRoleRecord.save(null,token(req))
+    }
+
+
+    res.status(200).json({})
+  } catch (e) {
+    res.status(e.code? e.code: 500).json({ message: e.message })
+  }
+})
+
+// 给用户添加点数
+router.post('/points', async (req, res) => {
+  try {
+    let { username, points } = req.body
+    // 检查操作者
+    let operationUser = await AV.User.become(req.headers['x-lc-session'])
+    let operationUserRoles = J(await operationUser.getRoles())
+    let isManager = operationUserRoles.find(item => item.name == 'Manager')
+    if (!isManager) throw new Error("user don't have access to api")
+
+    // 检查point
+    if (typeof points !== 'number' || points <= 0) throw new Error('points should be number and grater than 0')
+    let user = await getUserWithRoot(username)
+    // 检查user
+    if (!user.length) return res.status(404).json({ message: 'user is not exist'})
+
+    user[0].increment('points', points)
+    let result = await user[0].save({}, {useMasterKey: true})
+    
+    res.status(200).json(result)
+  } catch (e) {
+    res.status(e.code? e.code: 500).json({ message: e.message })
+  }
 })
 
 // 注册验证码
@@ -148,95 +236,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-// 给用户添加角色
-router.post('/role', async (req, res) => {
-  try {
-    let { username, types, time, vip } = req.body
-    // 检验参数
-    if (!username) return res.status(400).json({ message: 'username is required'})
-    if (!vip && (!types || !Array.isArray(types) || types.length == 0)) 
-      return res.status(400).json({ message: 'type is required'})
-    if (!time || (typeof time) !== 'number') 
-      return res.status(400).json({ message: 'time is required'})
 
-    // 检查用户用户
-    let user = await getUserWithRoot(username)
-    if (!user.length) return res.status(404).json({ message: 'user is not exist'})
-
-    // 检查types, 获取roles
-    let roles
-    if (vip) roles = await getVipRoles(req)
-    else roles = await getRoles(types, req)
-    if (roles.length == 0 ) return res.status(403).json({message: 'can not fond role'})
-
-    // 为用户赋予角色
-    for(let i = 0; i < roles.length; i++) {
-
-      // 创建角色记录
-      let { oldRoleRecord, newRoleRecord } = await createRoleRecord(req,
-        user[0].attributes.username, roles[i].attributes.name, 
-        roles[i].attributes.typeName, time, '由管理员创建')
-
-      // 查询用户是否已拥有角色
-      let roleQuery = new AV.Query(AV.Role)
-      roleQuery.equalTo('name', roles[i].attributes.name)
-      roleQuery.equalTo('users', user[0])
-      let roleResult = await roleQuery.find(token(req))
-
-      if (roleResult.length > 0) {
-        // 用户具备当前角色
-        console.log('用户具备当前角色')
-      } else {
-        // 用户不具备当前角色
-        console.log('用户不具备当前角色')
-        let relation = roles[i].getUsers()
-        relation.add(user[0])
-        await roles[i].save({}, token(req))
-      }
-
-      if (oldRoleRecord) {
-        oldRoleRecord.set('active', false)
-        await oldRoleRecord.save(null,token(req))
-      }
-
-      newRoleRecord.set('active', true)
-      await newRoleRecord.save(null,token(req))
-    }
-
-
-    res.status(200).json({})
-  } catch (e) {
-    res.status(e.code? e.code: 500).json({ message: e.message })
-  }
-})
-
-
-// 给用户添加点数
-router.post('/points', async (req, res) => {
-  try {
-    let { username, points } = req.body
-    // 检查操作者
-    let operationUser = await AV.User.become(req.headers['x-lc-session'])
-    let operationUserRoles = J(await operationUser.getRoles())
-    let isManager = operationUserRoles.find(item => item.name == 'Manager')
-    if (!isManager) throw new Error("user don't have access to api")
-
-    // 检查point
-    if (typeof points !== 'number' || points <= 0) throw new Error('points should be number and grater than 0')
-    let user = await getUserWithRoot(username)
-    // 检查user
-    if (!user.length) return res.status(404).json({ message: 'user is not exist'})
-
-    user[0].increment('points', points)
-    let result = await user[0].save({}, {useMasterKey: true})
-    
-    res.status(200).json(result)
-  } catch (e) {
-    res.status(e.code? e.code: 500).json({ message: e.message })
-  }
-})
-
-// 消费点数
 
 // 创建角色记录
 const createRoleRecord = async (req, username, roleName, typeName, time, mark) => {
