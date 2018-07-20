@@ -1,14 +1,12 @@
 var router = require('express').Router()
 var AV = require('leanengine')
+var { rootVer } = require('./middleware')
 var { getUserWithRoot, getVipRoles, getRoles } = require('./lib')
-var { createErr, setPoints, setRoles } = require('./lib')
+var { createErr, setPoints, setRoles, token } = require('./lib')
 
 /**
- @module User 
+ @module User
 */
-const token = req => {
-  return { sessionToken: req.headers['x-lc-session'] }
-}
 
 // 查询所有用户， 管理员可用
 router.get('/all', async (req, res) => {
@@ -22,6 +20,7 @@ router.get('/all', async (req, res) => {
     let count = await countQuery.count(token(req))
     // 查询数据
     let data = await userQuery.find(token(req))
+    console.log(data)
     res.status(200).json({count, data})
   } catch (e) {
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
@@ -114,7 +113,7 @@ router.post('/points', async (req, res) => {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
 })
-
+// -------------------------------以上为管理员操作-------------------------------
 // 注册验证码
 router.post('/code', async (req, res) => {
   try {
@@ -135,7 +134,7 @@ router.post('/code', async (req, res) => {
 // 注册用户
 router.post('/', async (req, res) => {
   try {
-    let { username, password, code } = req.body
+    let { username, password, code, sale } = req.body
     if (!username) throw createErr('用户名不能为空', 400)
     if (!password) throw createErr('密码不能为空', 400)
     if (!code) throw createErr('验证码不能为空', 400)
@@ -143,7 +142,7 @@ router.post('/', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length > 0) throw createErr('用户已存在', 401)
 
-    let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0 })
+    let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0, sale })
     let sessionToken = newUser.getSessionToken()
 
     // await setRoles([newUser], ['Vip'], 180, '新用户赠送60天会员')
@@ -183,39 +182,6 @@ router.post('/password', (req, res) => {
   }, err => res.status(400).json({ message: err.message}))
 })
 
-router.post('/relation', (req, res) => {
-  let { typeCode, userId } = req.body
-
-  if (!typeCode || !userId) return res.status(400).json({ message: 'params error'})
-  if (typeof typeCode !== 'number') return res.status(400).json({ message: 'typeCode should be number'})
-  if (typeof userId !== 'string') return res.status(400).json({ message: 'userId should be string'})
-
-  let typeQuery = new AV.Query('WordsDBTypeInfo')
-  typeQuery.equalTo('code', typeCode)
-
-  let userQuery = new AV.Query('_User')
-  userQuery.equalTo('objectId', userId)
-  let typeId
-  
-  // 根据code 查询
-  typeQuery.find(token(req)).then(result => {
-    if (result.length !== 1) return res.status(400).json({ message: 'typeCode is invalid'})
-    typeId = result[0].id
-    return userQuery.find(token(req))
-  }, err => res.status(400).json({ message: 'check code error'})).then(result => {
-    if (result.length !== 1) return res.status(400).json({ message: 'userId is invalid'})
-    let user = AV.Object.createWithoutData('_User', userId)
-    let wordsDBType = AV.Object.createWithoutData('WordsDBTypeInfo', typeId)
-
-    let Relation = AV.Object.extend('UserAndWordsRelationInfo')
-    let relation = new Relation()
-
-    return relation.save({ user, wordsDBType}, token(req))
-  }).then(result => {
-    res.status(200).json(result)
-  }, err => res.status(500).json({ message: err.rawMessage }))
-})
-
 // 查询用户角色
 router.get('/', async (req, res) => {
   try {
@@ -229,14 +195,12 @@ router.get('/', async (req, res) => {
     recordQuery.equalTo('active', true)
     let roles = await recordQuery.find({useMasterKey: true})
     let vip = roles.length > 0?true: false
-    res.status(200).json({points, roles, count, countWord, vip})
+    res.status(200).json({points, roles, count, countWord })
     
   } catch (e) {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
 })
-
-
 
 // 创建角色记录
 const createRoleRecord = async (req, username, roleName, typeName, time, mark) => {

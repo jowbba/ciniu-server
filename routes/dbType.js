@@ -19,9 +19,9 @@ const getSameCode = (code, req) => {
 }
 
 // 查询角色是否存在
-const queryRoleOfType = (code, req) => {
+const queryRoleOfType = (name, req) => {
   let roleQuery = new AV.Query(AV.Role)
-  roleQuery.equalTo('name', code)
+  roleQuery.equalTo('name', name)
   return roleQuery.find(token(req))
 }
 

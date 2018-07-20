@@ -4,7 +4,7 @@ var router = require('express').Router()
 var AV = require('leanengine')
 var AlipaySdk = require('alipay-sdk').default
 var AlipayFormData = require('alipay-sdk/lib/form').default
-var { getAllRelations, createErr, setPoints, setRoles, setRoles2, getUserWithRoot } = require('./lib')
+var { getAllRelations, createErr, resErr, setPoints, setRoles, setRoles2, getUserWithRoot } = require('./lib')
 
 const Alipay = require('alipay-node-sdk');
 
@@ -20,56 +20,28 @@ var ali = new Alipay({
   signType: 'RSA2'
 });
 
-// 创建订单1
+/** 
+  * 创建用户订单API
+  @param {Number} annualCount - 会员期限
+  @param {Number} pointIndex - 购买点数类型ID
+  @param {String} invoiceClassify - 发票材质
+  @param {String} invoiceType - 发票类型
+  @param {String} invoiceTitle - 发票抬头
+  @param {String} invoiceId - 发票纳税人识别号
+  @param {String} address - 发票地址
+  @param {String} email - 收件地址
+  @param {String} name - 收件人姓名
+  @param {String} phone - 收件人手机号
+  @param {String} code -收件人邮编
+  @param {String} pay -支付方式
+*/
+// 创建订单
 router.post('/', async (req, res) => {
   try {
     let user = await AV.User.become(req.headers['x-lc-session'])
     let { username } = user.attributes
-    let { types, pointIndex } = req.body
-    if (!types) types = []
-    if (!user) throw createErr('user is not login', 403)
-    if (!types || !Array.isArray(types)) throw createErr('types is required', 400)
-    if (types.length == 0 && pointIndex == -1) throw createErr('pay content is empty')
-    if (!pointIndex ) throw createErr('pointIndex is required')
-    
-    let { price, points, roles, describe, time } = createTrade(types, pointIndex)
-    // 创建订单信息
-    let acl = new AV.ACL()
-    acl.setReadAccess(user, true)
-    acl.setRoleReadAccess('Manager', true)
-    acl.setRoleWriteAccess('Manager', true)
-    let Trade = AV.Object.extend('Trade')
-    let trade = new Trade()
-    trade.setACL(acl)
-
-    let result = await trade.save({username, price, points, roles, describe, status: '', time}, {useMasterKey: true})
-
-    var params = ali.pagePay({
-      subject: '词牛充值',
-      body: describe,
-      outTradeId: result.id, //as out_trade_no
-      timeout: '10m',
-      amount: price,
-      goodsType: '0',
-      qrPayMode: 2,
-      return_url: 'http://www.ciniuwang.com/paid'
-  });
-  
-  let url = gateway + '?' + params
-
-  res.status(200).json({ url, result })
-  } catch (e) {
-    console.log(e)
-    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
-  }
-})
-
-// 创建订单2
-router.post('/2', async (req, res) => {
-  try {
-    let user = await AV.User.become(req.headers['x-lc-session'])
-    let { username } = user.attributes
-    let { annualCount, pointIndex, invoiceClassify, invoiceType, invoiceTitle, invoiceId, address, email, name, phone, code, pay } = req.body
+    let { annualCount, pointIndex, invoiceClassify, invoiceType, invoiceTitle,
+      invoiceId, address, email, name, phone, code, pay } = req.body
     annualCount = Number(annualCount)
     // 检查参数
     if (!user) throw createErr('user is not login', 403)
@@ -103,9 +75,9 @@ router.post('/2', async (req, res) => {
   let url = gateway + '?' + params
 
   res.status(200).json({ url, result })
-  } catch (e) {
-    console.log(e)
-    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+  } catch (err) {
+    console.log(err)
+    resErr(res, err)
   }
 })
 

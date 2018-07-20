@@ -5,6 +5,17 @@ module.exports = {
     return Object.assign(new Error(message), { code })
   },
 
+  token: req => {
+    return { sessionToken: req.headers['x-lc-session'] }
+  },
+
+  resErr: (res, error) => {
+    let code = error.code > 200? error.code: 500
+    let message = error.message
+    console.log(code, error)
+    res.status(code).json({ message })
+  },
+
   // 通过用户名获取用户对象(root)
   getUserWithRoot: async (username) => {
     let userQuery = new AV.Query('_User')
@@ -73,8 +84,6 @@ module.exports = {
     console.log(points)
     user[0].increment('points', points)
     await user[0].save({}, { useMasterKey: true })
-
-
   },
 
   // 以超级用户给用户添加会员

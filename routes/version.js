@@ -5,7 +5,7 @@ var { createErr } = require('./lib')
 
 router.get('/', async (req, res) => {
   try {
-    let version = '1.0.0.0'
+    let version = '1.0.3'
     res.status(200).json({version})
 
   } catch (e) {
