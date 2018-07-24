@@ -66,6 +66,8 @@ app.use('/version', require('./routes/version'))
 
 app.use('/consume', require('./routes/consume'))
 
+app.use('/query', require('./routes/query'))
+
 
 
 app.use(function(req, res, next) {
