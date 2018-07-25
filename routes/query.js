@@ -1,5 +1,6 @@
 var router = require('express').Router()
 var AV = require('leanengine')
+var request = require('request')
 var { createErr } = require('./lib')
 var { rootVer } = require('./middleware')
 
@@ -25,14 +26,17 @@ router.post('/', rootVer, async (req, res) => {
     let result
     switch(type) {
       case 'register':
-      result = await getRegisterInfo(id, bTime, eTime, skip, limit)
-      break;
+        result = await getRegisterInfo(id, bTime, eTime, skip, limit)
+        break;
+      case 'download':
+        result = await getDownloadInfo(id, begin, end)
+        break;
       default:
-      console.log('in default')
+        console.log('in default')
     }
     res.status(200).json(result)
   } catch (e) {
-    console.log(e.message)
+    console.log(e)
     res.status(500).json({message: e.message})
   }
 })
@@ -53,6 +57,45 @@ const getRegisterInfo = async (id, bTime, eTime, skip, limit) => {
   return { count, data }
 }
 
+const getDownloadInfo =  (id, begin, end) => {
+  let options = {
+    url: 'https://api.baidu.com/json/tongji/v1/ReportService/getData',
+    method: 'POST',
+    headers: 'application/json',
+    body: JSON.stringify({
+      header: {
+        account_type: 1,
+        password: "jowaab11",
+        token: "d25bcef17ffc3cdd10169bec1413d2ac",
+        username: "jowbba"
+      },
+      body: {
+        siteId: "12276044",
+        method: "custom/event_track/a",
+        start_date: begin.split('-').join(''),
+        end_date: end.split('-').join(''),
+        metrics: "event_count, uniq_event_count"
+      }
+    })
+  }
+
+  return new Promise((resolve, reject) => {
+    request(options, (err, res) => {
+      if (err) return console.log(err)
+      let result = JSON.parse(res.body).body.data
+      if (!result || !result[0]) return reject(new Error('get data err'))
+      // console.log(result[0].result)
+      result = result[0].result
+      let event = result.items[0].findIndex(item => 
+        item[0]['c'] == 'download' && item[0]['a'] == 'click' && item[0]['l'] == `id=${id}`)
+      if (event == -1) return reject(new Error('can not get event'))
+      let count = result.items[1][event]
+      resolve(count)
+    })
+  })
+
+}
+
 const getConsumeInfo = async (bTime, eTime) => {
 
 }
@@ -65,6 +108,11 @@ const split = (count, perSize) => {
     position += perSize
   }
   return arr
+}
+
+const splitDate = d => {
+  let dates = d.split('-').join('')
+
 }
 
 
