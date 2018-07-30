@@ -7,8 +7,8 @@ var { rootVer } = require('./middleware')
 router.post('/', rootVer, async (req, res) => {
   try {
     let { type, id, begin, end, skip, limit } = req.body
-    let bTime = new Date(begin)
-    let eTime = new Date(end)
+    let bTime = new Date(Date.parse(begin) - 8 * 3600 * 1000)
+    let eTime = new Date(Date.parse(end) - 8 * 3600 * 1000)
     // check id
     if (!['1', '2'].includes(id)) 
       return res.status(400).send({ message: 'id error'})
@@ -26,10 +26,22 @@ router.post('/', rootVer, async (req, res) => {
     let result
     switch(type) {
       case 'register':
-        result = await getRegisterInfo(id, bTime, eTime, skip, limit)
+        result = await getRegisterInfo(id, bTime, eTime)
         break;
       case 'download':
         result = await getDownloadInfo(id, begin, end)
+        let now = new Date()
+        let year = now.getFullYear()
+        let month = now.getMonth() + 1
+        if (month < 10) month = '0' + month
+        let date = now.getDate()
+        if (date < 10) date = '0' +  date
+        let b = `${year}-${month}-${date}`
+        let total = await getDownloadInfo(id, '2018-07-01', b)
+        Object.assign(result, {total: total.data})
+        break;
+      case 'consume':
+        result = await getConsumeInfo(id, bTime, eTime)
         break;
       default:
         console.log('in default')
@@ -41,11 +53,14 @@ router.post('/', rootVer, async (req, res) => {
   }
 })
 
-const getRegisterInfo = async (id, bTime, eTime, skip, limit) => {
+// 注册统计
+const getRegisterInfo = async (id, bTime, eTime) => {
   let query = new AV.Query('_User')
-  query.greaterThan('createdAt', bTime)
-  query.lessThan('createdAt', eTime)
   query.equalTo('sale', id)
+  let total = await query.count({ useMasterKey: true })
+  if (bTime) query.greaterThan('createdAt', bTime)
+  if (eTime) query.lessThan('createdAt', eTime)
+  
   let count = await query.count({ useMasterKey: true })
   let splitArr = split(count, 100)
   let data = []
@@ -54,9 +69,10 @@ const getRegisterInfo = async (id, bTime, eTime, skip, limit) => {
     query.limit(splitArr[i].limit)
     data = [...data, ...await query.find({ useMasterKey: true })]
   }
-  return { count, data }
+  return { count, data, total }
 }
 
+// 下载统计
 const getDownloadInfo =  (id, begin, end) => {
   let options = {
     url: 'https://api.baidu.com/json/tongji/v1/ReportService/getData',
@@ -84,22 +100,58 @@ const getDownloadInfo =  (id, begin, end) => {
       if (err) return console.log(err)
       let result = JSON.parse(res.body).body.data
       if (!result || !result[0]) return reject(new Error('get data err'))
-      // console.log(result[0].result)
       result = result[0].result
       let event = result.items[0].findIndex(item => 
         item[0]['c'] == 'download' && item[0]['a'] == 'click' && item[0]['l'] == `id=${id}`)
       if (event == -1) return reject(new Error('can not get event'))
       let count = result.items[1][event]
-      resolve(count)
+      resolve({data: count})
     })
   })
-
 }
 
-const getConsumeInfo = async (bTime, eTime) => {
+// 消费统计
+const getConsumeInfo = async (id, bTime, eTime) => {
+  let { data } = await getRegisterInfo(id)
+  let consumeUserCount = 0
+  let currentConsumeUserCount = 0
+  let records = []
+  for(let i = 0; i < data.length; i++) {
+    let first = 0, second = 0, current = 0, include = false
+    // 查询当前用户消费记录
+    let username = data[i].attributes.username
+    let trades = await getConsumeByUsername(username)
+    // 计算是否是付费用户
+    if (trades.length == 0) continue
+    else consumeUserCount += 1
+    
+    for(let j = 0; j < trades.length; j++) {
+      // 首冲金额
+      if (j == 0) first = trades[j].attributes.price
+      // 二次充值金额
+      else if (j == 1) second = trades[j].attributes.price
+      // 计算日期范围内充值金额
+      else {
+        let currentRecords = await getConsumeByUsername(username, bTime, eTime)
+        currentRecords.forEach((item, index) => {
+          if (item.id == trades[0].id || item.id == trades[1].id) return
+          current += item.attributes.price
+          if (!include) {
+            currentConsumeUserCount += 1
+            include = true
+          }
+        })
+        break
+      }
+    }
 
+    records.push({ username, first, second, current })
+  }
+
+  return { consumeUserCount, currentConsumeUserCount, records}
 }
 
+// 分页获取全部数据
 const split = (count, perSize) => {
   let arr = []
   let position = 0
@@ -110,9 +162,15 @@ const split = (count, perSize) => {
   return arr
 }
 
-const splitDate = d => {
-  let dates = d.split('-').join('')
-
+const getConsumeByUsername = async (username, bTime, eTime) => {
+  let tradeQuery = new AV.Query('Trade')
+  tradeQuery.equalTo('username', username)
+  tradeQuery.equalTo('status', 'TRADE_SUCCESS')
+  tradeQuery.ascending('createdAt')
+  if (bTime) tradeQuery.greaterThan('createdAt', bTime)
+  if (eTime) tradeQuery.lessThan('createdAt', eTime)
+  let trades = await tradeQuery.find({ useMasterKey: true })
+  return trades
 }
 
 
