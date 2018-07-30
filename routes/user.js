@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length > 0) throw createErr('用户已存在', 401)
 
-    let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0, sale })
+    let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0, sale: sale?sale:'-1' })
     let sessionToken = newUser.getSessionToken()
 
     // await setRoles([newUser], ['Vip'], 180, '新用户赠送60天会员')

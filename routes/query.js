@@ -10,7 +10,7 @@ router.post('/', rootVer, async (req, res) => {
     let bTime = new Date(Date.parse(begin) - 8 * 3600 * 1000)
     let eTime = new Date(Date.parse(end) - 8 * 3600 * 1000)
     // check id
-    if (!['1', '2'].includes(id)) 
+    if (!['-1','0','1', '2'].includes(id)) 
       return res.status(400).send({ message: 'id error'})
     // check time
     if (!type || !id || !begin || !end) 
@@ -56,7 +56,7 @@ router.post('/', rootVer, async (req, res) => {
 // 注册统计
 const getRegisterInfo = async (id, bTime, eTime) => {
   let query = new AV.Query('_User')
-  query.equalTo('sale', id)
+  query.equalTo('sale', id) 
   let total = await query.count({ useMasterKey: true })
   if (bTime) query.greaterThan('createdAt', bTime)
   if (eTime) query.lessThan('createdAt', eTime)
