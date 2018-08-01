@@ -81,7 +81,6 @@ module.exports = {
     // 检查user
     if (!user.length) throw new Error('user not exits')
     // 增加点数
-    console.log(points)
     user[0].increment('points', points)
     await user[0].save({}, { useMasterKey: true })
   },

@@ -209,7 +209,6 @@ router.get('/2', (req, res) => {
 
   }, err => res.status(404).json({ message: err.rawMessage}))
   .then(types => {
-    console.log()
     if (types.length == 0) return res.status(403).json({ message: 'word is not available'})
     // 查询词条件
     typeArr = types.map(item => {

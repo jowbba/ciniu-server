@@ -20,7 +20,6 @@ router.get('/all', async (req, res) => {
     let count = await countQuery.count(token(req))
     // 查询数据
     let data = await userQuery.find(token(req))
-    console.log(data)
     res.status(200).json({count, data})
   } catch (e) {
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })

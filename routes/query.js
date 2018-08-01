@@ -10,7 +10,7 @@ router.post('/', rootVer, async (req, res) => {
     let bTime = new Date(Date.parse(begin) - 8 * 3600 * 1000)
     let eTime = new Date(Date.parse(end) - 8 * 3600 * 1000)
     // check id
-    if (!['-1','0','1', '2'].includes(id)) 
+    if (!['-1','cnsa1', 'cnsa2', 'cnsa3'].includes(id)) 
       return res.status(400).send({ message: 'id error'})
     // check time
     if (!type || !id || !begin || !end) 
@@ -20,14 +20,14 @@ router.post('/', rootVer, async (req, res) => {
     if (bTime >= eTime) 
       return res.status(400).send({ message: 'bTime should less than eTime'})
     // check type
-    if (!['register', 'consume', 'download'].includes(type))
+    if (!['register', 'consume', 'download', 'point'].includes(type))
       return res.status(400).send({ message: 'type error'})
 
     let result
     switch(type) {
       case 'register':
         result = await getRegisterInfo(id, bTime, eTime)
-        break;
+        break
       case 'download':
         result = await getDownloadInfo(id, begin, end)
         let now = new Date()
@@ -39,10 +39,13 @@ router.post('/', rootVer, async (req, res) => {
         let b = `${year}-${month}-${date}`
         let total = await getDownloadInfo(id, '2018-07-01', b)
         Object.assign(result, {total: total.data})
-        break;
+        break
       case 'consume':
         result = await getConsumeInfo(id, bTime, eTime)
-        break;
+        break
+      case 'point':
+        result = await getPointsInfo(id, bTime, eTime)
+        break
       default:
         console.log('in default')
     }
@@ -97,12 +100,24 @@ const getDownloadInfo =  (id, begin, end) => {
 
   return new Promise((resolve, reject) => {
     request(options, (err, res) => {
-      if (err) return console.log(err)
+      if (err) return reject(err)
       let result = JSON.parse(res.body).body.data
       if (!result || !result[0]) return reject(new Error('get data err'))
       result = result[0].result
-      let event = result.items[0].findIndex(item => 
-        item[0]['c'] == 'download' && item[0]['a'] == 'click' && item[0]['l'] == `id=${id}`)
+
+      let condition
+      if (id == '-1') {
+        condition = item => {
+          return item[0]['c'] == 'download' && item[0]['a'] == 'click' && item[0]['l'] == `-`
+        }
+      } else {
+        condition = item => {
+          return item[0]['c'] == 'download' && item[0]['a'] == 'click' && item[0]['l'] == `id=${id}`
+        }
+        
+      }
+
+      let event = result.items[0].findIndex(condition)
       if (event == -1) return reject(new Error('can not get event'))
       let count = result.items[1][event]
       resolve({data: count})
@@ -151,6 +166,37 @@ const getConsumeInfo = async (id, bTime, eTime) => {
   return { consumeUserCount, currentConsumeUserCount, records}
 }
 
+const getPointsInfo = async (id, bTime, eTime) => {
+  let { data } = await getRegisterInfo(id)
+  let activeUserCount = 0
+  let detail = []
+  let totalWord = 0
+  let totalImage = 0
+
+  for(let i = 0; i < data.length; i++) {
+    
+    let word = 0, image = 0
+    let username = data[i].attributes.username
+    let record = await getRecordByUsername(username, bTime, eTime)
+    if (record.length == 0) continue
+    activeUserCount += 1
+    record.forEach(item => {
+      if (item.attributes.type == 'word') {
+        word +=1
+        totalWord += 1
+      }
+      else if (item.attributes.type == 'image') {
+        image += 1
+        totalImage += 1
+      }
+    })
+    
+    detail.push({ username, word, image})
+  }
+
+  return { activeUserCount, totalImage, totalWord, detail }
+}
+
 // 分页获取全部数据
 const split = (count, perSize) => {
   let arr = []
@@ -170,6 +216,16 @@ const getConsumeByUsername = async (username, bTime, eTime) => {
   if (bTime) tradeQuery.greaterThan('createdAt', bTime)
   if (eTime) tradeQuery.lessThan('createdAt', eTime)
   let trades = await tradeQuery.find({ useMasterKey: true })
+  return trades
+}
+
+const getRecordByUsername = async (username, bTime, eTime) => {
+  let recordQuery = new AV.Query('PointConsume')
+  recordQuery.equalTo('username', username)
+  recordQuery.ascending('createdAt')
+  if (bTime) recordQuery.greaterThan('createdAt', bTime)
+  if (eTime) recordQuery.lessThan('createdAt', eTime)
+  let trades = await recordQuery.find({ useMasterKey: true })
   return trades
 }
 
