@@ -46,29 +46,27 @@ app.get('/', function(req, res) {
 });
 
 // 可以将一类的路由单独保存在一个文件中
-app.use('/todos', require('./routes/todos'));
+app.use('/user', require('./routes/v0/user'))
 
-app.use('/user', require('./routes/user'))
+app.use('/token', require('./routes/v0/sessionToken'))
 
-app.use('/token', require('./routes/sessionToken'))
+app.use('/word', require('./routes/v0/word'))
 
-app.use('/word', require('./routes/word'))
+app.use('/type', require('./routes/v0/dbType'))
 
-app.use('/type', require('./routes/dbType'))
+app.use('/category', require('./routes/v0/category'))
 
-app.use('/category', require('./routes/category'))
+app.use('/ocr', require('./routes/v0/ocr'))
 
-app.use('/ocr', require('./routes/ocr'))
+app.use('/pay', require('./routes/v0/pay'))
 
-app.use('/pay', require('./routes/pay'))
+app.use('/version', require('./routes/v0/version'))
 
-app.use('/version', require('./routes/version'))
+app.use('/consume', require('./routes/v0/consume'))
 
-app.use('/consume', require('./routes/consume'))
+app.use('/query', require('./routes/v0/query'))
 
-app.use('/query', require('./routes/query'))
-
-
+app.use('/v1.0', require('./routes/v1'))
 
 app.use(function(req, res, next) {
   // 如果任何一个路由都没有返回响应，则抛出一个 404 异常给后续的异常处理器

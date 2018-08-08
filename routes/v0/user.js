@@ -1,6 +1,6 @@
 var router = require('express').Router()
 var AV = require('leanengine')
-var { rootVer } = require('./middleware')
+var { rootVer, basicVer } = require('./middleware')
 var { getUserWithRoot, getVipRoles, getRoles } = require('./lib')
 var { createErr, setPoints, setRoles, token } = require('./lib')
 
@@ -116,13 +116,15 @@ router.post('/points', async (req, res) => {
 // 注册验证码
 router.post('/code', async (req, res) => {
   try {
+    console.log('....')
     let { username } = req.body
     if (!username) return res.status(400).json({ message: 'username is required'})
     let existUser = await getUserWithRoot(username)
-    if (existUser.length > 0) throw createErr('用户已存在', 401)
+    if (existUser.length > 0) throw createErr('用户已存在', 400)
     AV.Cloud.requestSmsCode(username).then(success => {
       res.status(200).json({ message: 'ok'})
     }, err => {
+      console.log(err)
       res.status(400).json({ message: err.message })
     })
   } catch (e) {
@@ -139,7 +141,7 @@ router.post('/', async (req, res) => {
     if (!code) throw createErr('验证码不能为空', 400)
 
     let existUser = await getUserWithRoot(username)
-    if (existUser.length > 0) throw createErr('用户已存在', 401)
+    if (existUser.length > 0) throw createErr('用户已存在', 400)
 
     let newUser = await AV.User.signUpOrlogInWithMobilePhone(username, code, { password, points: 0, sale: sale?sale:'-1' })
     let sessionToken = newUser.getSessionToken()
@@ -196,6 +198,21 @@ router.get('/', async (req, res) => {
     let vip = roles.length > 0?true: false
     res.status(200).json({points, roles, count, countWord })
     
+  } catch (e) {
+    res.status(e.code? e.code: 500).json({ message: e.message })
+  }
+})
+
+router.get('/test', basicVer, async (req, res) => {
+  try {
+    let { user, sessionToken } = req
+    let U = new AV.Query('_User')
+    U.equalTo('username', 'admin')
+
+    
+    let u = await U.first({ sessionToken })
+    u.increment('points', 100)
+    await u.save({}, { sessionToken })
   } catch (e) {
     res.status(e.code? e.code: 500).json({ message: e.message })
   }
