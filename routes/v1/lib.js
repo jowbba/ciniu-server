@@ -75,12 +75,26 @@ module.exports = {
       relationQuery.descending('createdAt')
       return relationQuery.find(token(req))
     })
-    let relations = await Promise.all(queryArr)
+
+    // ---------------------------------------------------
+
+    // let relations = await Promise.all(queryArr)
+
+    // ---------------------------------------------------
+    let relations = []
+
+    // for(let i = 0; i < queryArr.length; i++) {
+    //   let result = await queryArr[i]
+    //   relations.push(result)
+    // }
+
+    // ---------------------------------------------------
 
     relations = relations.reduce((total, current) => {
       return [...total, ...current]
     }, [])
     relations = JSON.parse(JSON.stringify(relations))
+
     return relations
   },
 

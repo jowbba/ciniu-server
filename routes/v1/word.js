@@ -236,10 +236,11 @@ router.get('/', basicVer, async (req, res) => {
         m.set(code, { name, code, type: [ typeObj ], category: [ categoryObj ] })
       }
     })
-    
-    createResult(res, [...m.values()])
+
+    res.status(200).json({ data: [...m.values()]})
+
   } catch (e) {
-    console.log(e.message, 'in get word relation')
+    console.log(e, 'in get word relation')
     res.status(500).json({ message: e.message })
   }
   
