@@ -10,7 +10,8 @@ module.exports = {
       req.user = user
       req.sessionToken = req.headers['x-lc-session']
       next()
-    } catch (e) { res.status(403).json(e) }
+    } catch (e) { 
+      res.status(403).json(e) }
 
   },
 

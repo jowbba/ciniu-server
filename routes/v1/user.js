@@ -121,10 +121,10 @@ router.post('/code', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length > 0) throw createErr('用户已存在', 200)
     await AV.Cloud.requestSmsCode(username)
-    createResult('')
+    createResult(res, '')
   } catch (e) {
     console.log(e.message, 'in code')
-    createError(e)
+    createError(res, e)
   }
 })
 
@@ -150,11 +150,13 @@ router.post('/', async (req, res) => {
     recordQuery.equalTo('active', true)
     let roles = await recordQuery.find({useMasterKey: true})
     let result = JSON.stringify(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken, roles}))
-    res.status(200).json({state: true, code: 200, message: 'ok', result})
+    createResult(res, result)
+    // res.status(200).json({state: true, code: 200, message: 'ok', result})
   } catch (e) {
     console.log(e.message, 'in register')
-    let message = e.rawMessage?e.rawMessage:e.message
-    res.status(200).json({ message, state: false, code: 200, result: '' })
+    createErr(res, e)
+    // let message = e.rawMessage?e.rawMessage:e.message
+    // res.status(200).json({ message, state: false, code: 200, result: '' })
   }
 })
 
@@ -166,11 +168,13 @@ router.post('/pwdcode', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length == 0) throw createErr('用户不存在', 200)
     await AV.User.requestPasswordResetBySmsCode(username)
-    res.status(200).json({ message: 'ok', state: true, code: 200, result: ''})
+    createResult(res, result)
+    // res.status(200).json({ message: 'ok', state: true, code: 200, result: ''})
   } catch (e) {
     console.log(e.message, 'in pwdcode')
-    let message = e.rawMessage?e.rawMessage:e.message
-    res.status(200).json({ message, state: false, code: 200, result: '' })
+    createErr(res, e)
+    // let message = e.rawMessage?e.rawMessage:e.message
+    // res.status(200).json({ message, state: false, code: 200, result: '' })
   }
 })
 
@@ -193,7 +197,8 @@ router.post('/password', async (req, res) => {
     let sessionToken = user.getSessionToken()
     let result = JSON.stringify(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, points, roles, count}))
 
-    res.status(200).json({state: true, code: 200, message: 'ok', result})
+    createResult(res, result)
+    // res.status(200).json({state: true, code: 200, message: 'ok', result})
   } catch (e) {
     console.log(e.message, 'in password')
     let message = e.rawMessage?e.rawMessage:e.message

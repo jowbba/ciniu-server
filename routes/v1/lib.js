@@ -11,7 +11,7 @@ module.exports = {
   },
 
   createError: (res, err) => {
-    let message = err.rawMessage? err.rawMessage: err.message
+    let message = !!err.rawMessage? err.rawMessage: err.message
     res.status(200).json({ code: 200, message, result: '', state: false})
   },
 
@@ -83,10 +83,10 @@ module.exports = {
     // ---------------------------------------------------
     let relations = []
 
-    // for(let i = 0; i < queryArr.length; i++) {
-    //   let result = await queryArr[i]
-    //   relations.push(result)
-    // }
+    for(let i = 0; i < queryArr.length; i++) {
+      let result = await queryArr[i]
+      relations.push(result)
+    }
 
     // ---------------------------------------------------
 

@@ -211,6 +211,7 @@ router.get('/', basicVer, async (req, res) => {
     
     
     let m = new Map()
+    console.log(relations.length)
     relations.forEach((relation, index) => {
       let { contrabandWords, wordsDBType, wordsCategory } = relation
       //去除用户不勾选的词库
