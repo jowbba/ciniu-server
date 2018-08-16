@@ -1,3 +1,10 @@
+/*
+ * @Author: harry.liu 
+ * @Date: 2018-08-16 11:51:59 
+ * @Last Modified by: harry.liu
+ * @Last Modified time: 2018-08-16 11:54:14
+ */
+
 var router = require('express').Router()
 var AV = require('leanengine')
 var { rootVer, basicVer } = require('./middleware')
@@ -7,6 +14,7 @@ router.get('/', basicVer, async (req, res) => {
   try {
     let settingObj = await getSettingByUser(req.user)
     let result = settingObj.attributes
+    console.log(result)
     let { notSelected } = result
     result.types = []
     // 获取types

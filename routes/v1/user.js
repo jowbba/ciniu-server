@@ -121,10 +121,10 @@ router.post('/code', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length > 0) throw createErr('用户已存在', 200)
     await AV.Cloud.requestSmsCode(username)
-    createResult(res, '')
+    res.success('')
   } catch (e) {
     console.log(e.message, 'in code')
-    createError(res, e)
+    res.error(e)
   }
 })
 

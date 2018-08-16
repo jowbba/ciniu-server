@@ -24,6 +24,7 @@ module.exports = {
       let managerRole = roles.find(item => item.attributes.name === 'Manager')
       if (!managerRole) return res.status(403).json({ message: 'forbidden'})
       req.user = user
+      req.sessionToken = req.headers['x-lc-session']
       next()
     } catch (e) { res.status(403).json(e) }
 

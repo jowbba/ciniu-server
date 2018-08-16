@@ -1,5 +1,7 @@
 var AV = require('leanengine')
 
+const useMasterKey = true
+
 module.exports = {
   createErr: (message, code) => {
     return Object.assign(new Error(message), { code })
@@ -229,6 +231,32 @@ module.exports = {
       console.log(e)
       throw e
     }
+  },
+
+  // 查询所有新类目 类目会小于100条 不进行分页查询
+  getTypes: async () => {
+    let typeQuery = new AV.Query('WordsType')
+    return typeQuery.find({ useMasterKey })
+  },
+
+  // 根据typeId查询类目(root)
+  getTypeWithId: async (typeId) => {
+    let typeQuery = new AV.Query('WordsType')
+    typeQuery.equalTo('typeId', typeId)
+    return typeQuery.first({ useMasterKey })
+  },
+
+  // 根据clauseId查询条款(root)
+  getClauseWithId: async (clauseId) => {
+    let clauseQuery = new AV.Query('WordsLawClause')
+    clauseQuery.equalTo('clauseId', clauseId)
+    return clauseQuery.first({ useMasterKey })
+  },
+
+  getWordWithId: async (wordId) => {
+    let wordQuery = new AV.Query('Word')
+    wordQuery.equalTo('wordId', wordId)
+    return wordQuery.first({ useMasterKey })
   }
 }
 

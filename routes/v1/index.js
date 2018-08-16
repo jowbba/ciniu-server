@@ -27,5 +27,7 @@ router.use('/query', require('./query'))
 
 router.use('/setting', require('./setting'))
 
+router.use('/words', require('./words'))
+
 
 module.exports = router
