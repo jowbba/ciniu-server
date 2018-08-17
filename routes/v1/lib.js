@@ -3,6 +3,16 @@ var AV = require('leanengine')
 const useMasterKey = true
 
 module.exports = {
+  split: (count, perSize) => {
+    let arr = []
+    let position = 0
+    while (position < count) {
+      arr.push({ limit: perSize, skip: position })
+      position += perSize
+    }
+    return arr
+  },
+
   createErr: (message, code) => {
     return Object.assign(new Error(message), { code })
   },
@@ -221,7 +231,6 @@ module.exports = {
         setting.set('imageActive', true)
         setting.set('customActive', true)
         setting.set('notSelectedType', [])
-        setting.set('notSelectedCategory', [])
         setting.set('username', username)
         result = await setting.save({}, { sessionToken, fetchWhenSave: true })
       }
@@ -253,10 +262,22 @@ module.exports = {
     return clauseQuery.first({ useMasterKey })
   },
 
+  // 根据type 查找条款(root)
+  getClauseWithType: async () => {
+    let clauseQuery = new AV.Query('WordsLawClause')
+    clauseQuery.equalTo('clauseId', clauseId)
+  },
+
   getWordWithId: async (wordId) => {
     let wordQuery = new AV.Query('Word')
     wordQuery.equalTo('wordId', wordId)
     return wordQuery.first({ useMasterKey })
+  },
+
+  getSameWordRelation: async(word) => {
+    let relationQuery = new AV.Query('WordsRelation')
+    relationQuery.equalTo('word', word)
+    return relationQuery.first({ useMasterKey })
   }
 }
 

@@ -2,29 +2,29 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:51:59 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-16 11:54:14
+ * @Last Modified time: 2018-08-17 12:03:18
  */
 
 var router = require('express').Router()
 var AV = require('leanengine')
 var { rootVer, basicVer } = require('./middleware')
-var { createErr, getSettingByUser, createError, createResult } = require('./lib')
+var { createErr, getSettingByUser, createError, createResult, getTypeWithId } = require('./lib')
 
 router.get('/', basicVer, async (req, res) => {
   try {
     let settingObj = await getSettingByUser(req.user)
     let result = settingObj.attributes
     console.log(result)
-    let { notSelected } = result
+    let { notSelectedType } = result
     result.types = []
     // 获取types
-    let typeQuery = new AV.Query('WordsDBTypeInfo')
+    let typeQuery = new AV.Query('WordsType')
     let types = await typeQuery.find()
     // 处理types
     types.forEach(item => {
-      let { code, name } = item.attributes
-      let isSelected = notSelected.find(item => item == code)
-      result.types.push({ name, code, selected: !!isSelected? false: true})
+      let { typeId, typeName } = item.attributes
+      let isSelected = notSelectedType.find(item => item == typeId)
+      result.types.push({ typeName, typeId, selected: !!isSelected? false: true})
     })
     
     createResult(res, result)
@@ -38,26 +38,26 @@ router.patch('/', basicVer, async (req, res) => {
   try {
     let { user } = req
     let sessionToken = user.getSessionToken()
-    let { customActive, imageActive, notSelectedType, notSelectedCategory } = req.body
+    let { customActive, imageActive, notSelectedType } = req.body
     if (typeof customActive !== 'boolean') throw createErr('customActive is required')
     if (typeof imageActive !== 'boolean') throw createErr('imageActive is required')
 
+    // 检查types
     if (!notSelectedType || !Array.isArray(notSelectedType)) throw createErr('notSelected is required')
-    notSelectedType.forEach(item => {
-      if (typeof item !== 'number') throw createErr('error in notSelectedType')
-    })
+    for(let i = 0; i < notSelectedType.length; i++) {
+      let typeId = notSelectedType[i]
+      let type = await getTypeWithId(typeId)
+      if (!type) return res.error(`type id : ${typeId} not exist`)
+    }
 
-    if (!notSelectedCategory || !Array.isArray(notSelectedCategory)) throw createErr('notSelected is required')
-    notSelectedCategory.forEach(item => {
-      if (typeof item !== 'number') throw createErr('error in notSelectedCategory')
-    })
-
+    // 更新setting
     let setting = await getSettingByUser(user)
     setting.set('customActive', customActive)
     setting.set('imageActive', imageActive)
     setting.set('notSelectedType', notSelectedType)
     let result = await setting.save(null, { sessionToken })
-    createResult(res, result)
+
+    res.success(result)
   } catch (e) {
     console.log('error in post setting', e.message)
     createError(res, e)

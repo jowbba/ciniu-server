@@ -20,7 +20,7 @@ app.set('view engine', 'ejs');
 
 app.use(express.static('public'));
 
-app.use(logger('dev'));
+// app.use(logger('dev'));
 
 //设置日志文件目录
 var logDirectory=__dirname+'/logs';
