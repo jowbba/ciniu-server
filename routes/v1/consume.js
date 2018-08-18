@@ -1,6 +1,6 @@
 var router = require('express').Router()
 var AV = require('leanengine')
-var { createErr } = require('./lib')
+var { createErr, split } = require('./lib')
 var { basicVer } = require('./middleware')
 
 
@@ -24,8 +24,8 @@ router.post('/', basicVer, async (req, res) => {
     let pointsToConsume = n * 4
     // let actualPoints = pointsToConsume
     let actualPoints = 0
-    describe += `${n > 0?'达到500':'不到500字'}　扣点${pointsToConsume} `
-    
+    describe += `${n > 0 ? '达到500' : '不到500字'}　扣点${pointsToConsume} `
+
     // 更新用户对象
     user.increment('accountedWords', count)
     user.increment('consumedPoints', actualPoints)
@@ -47,20 +47,44 @@ router.post('/', basicVer, async (req, res) => {
 
 
     await record.save(
-      { type, username, count, pointsToConsume, actualPoints, toAccountWords, describe, fileName }, 
+      { type, username, count, pointsToConsume, actualPoints, toAccountWords, describe, fileName },
       { sessionToken })
-  
+
     res.status(200).json(user)
-    
+
   } catch (e) {
-    res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
+    res.status(e.code && e.code > 200 ? e.code : 500).json({ message: e.message })
   }
+})
+
+// 查询消费记录
+router.get('/', basicVer, async (req, res) => {
+  let { user, sessionToken } = req
+  let consumeQuery = new AV.Query('PointConsume')
+  consumeQuery.equalTo('username', user.attributes.username)
+  let count = await consumeQuery.count({})
+  let splitArr = split(count, 100)
+  let queryArr = splitArr.map(item => {
+    consumeQuery.limit(item.limit)
+    consumeQuery.skip(item.skip)
+    return consumeQuery.find({ sessionToken })
+  })
+
+  let consumes = []
+
+  for (let i = 0; i < queryArr.length; i++) {
+    let result = await queryArr[i]
+    
+    consumes = consumes.concat(result)
+  }
+
+  res.success(consumes)
 })
 
 // 添加用户待扣字数
 const addToAccountWords = async (user, count, sessionToken) => {
   user.increment('toAccountWords', count)
-  return await user.save({}, { sessionToken, fetchWhenSave: true,})
+  return await user.save({}, { sessionToken, fetchWhenSave: true, })
 }
 
 

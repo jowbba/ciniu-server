@@ -76,7 +76,7 @@ router.post('/lawClause', rootVer, joiValidator({
     // 插入
     let Clause = AV.Object.extend('WordsLawClause')
     let clause = new Clause()
-    let options = { clauseId, description, type }
+    let options = { clauseId, description, type, typeName: type.attributes.typeName }
     let newClause = await clause.save(options, { sessionToken })
     
     res.success(newClause)
@@ -131,6 +131,11 @@ router.post('/word', basicVer, joiValidator({
   
 })
 
+router.patch('/word/id', async (req, res) => {
+  
+} )
+
+// 查询所有词
 router.get('/word', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
@@ -294,26 +299,34 @@ router.post('/relation', rootVer, joiValidator({
   }
 })
 
+// 查询词的类目或解释
 router.get('/word/:id', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
     let { id } = req.params
-    console.log(id)
     let wordQuery = new AV.Query('Word')
     wordQuery.equalTo('objectId', id)
     let word = await wordQuery.first({ sessionToken })
     if (!word) return res.error('not exist')
-    console.log(word)
-    let { official } = word.attributes
+    let { official, comment, name, sensitive } = word.attributes
+    // console.log(word.attributes)
     let result = []
     if (official) {
-
+      // 查询词对应条款
+      let relationQuery = new AV.Query('WordsRelation')
+      relationQuery.equalTo('word', word)
+      relationQuery.include('clauses')
+      let relation = await relationQuery.first({ sessionToken })
+      relation.attributes.clauses.forEach(item => {
+        let { description, typeName } = item.attributes
+        result.push({ name, sensitive, data: description, official, typeName })
+      })
     } else {
-      
+      // 自建词 不包含条款
+      result.push({ name, sensitive, data: comment, official, typeName: ''})
     }
-
     
-    
+    res.success(result)
 
   } catch (e) {
     console.log('error in get word info', e.message)

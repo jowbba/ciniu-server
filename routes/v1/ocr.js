@@ -16,7 +16,7 @@ router.post('/', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
     let { toAccountWords } = req.user
-    let { image, recognize_granularity, vertexes_location } = req.body
+    let { image, recognize_granularity, vertexes_location, fileName } = req.body
     let { username } = user.attributes
     let options = {}
     let needToUpload = true
@@ -115,7 +115,7 @@ router.post('/', basicVer, async (req, res) => {
     let record = new Record()
     
     await record.save({ 
-      username, pointsToConsume, actualPoints, describe, count: 0, type: 'image', hash, toAccountWords }, 
+      username, pointsToConsume, actualPoints, describe, count: 0, type: 'image', hash, toAccountWords, fileName }, 
       { sessionToken })
 
     res.status(200).json(result)
