@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-20 10:46:24
+ * @Last Modified time: 2018-08-20 17:32:52
  * @function : 条款类目
  */
 
@@ -167,6 +167,7 @@ router.patch('/word/:id', basicVer, joiValidator({
     let sameWordQuery = new AV.Query('Word')
     sameWordQuery.equalTo('user', user)
     sameWordQuery.equalTo('name', name)
+    sameWordQuery.notEqualTo('objectId', id)
     let sameNameWord = await sameWordQuery.first({ sessionToken })
     if (sameNameWord) return res.error('exist same name custom word')
 
@@ -213,6 +214,7 @@ router.get('/word', basicVer, async (req, res) => {
       return clauseQuery
     })
 
+
     if (clauseCondition.length) {
       let clauseQuery = AV.Query.and(...clauseCondition)
       clauses = await clauseQuery.find({ sessionToken })
@@ -236,7 +238,7 @@ router.get('/word', basicVer, async (req, res) => {
     relationQuery.include('word')
     let relationCount = await relationQuery.count({ sessionToken })
 
-    let splitArr = split(relationCount, 100)
+    let splitArr = split(relationCount, 1000)
     let queryArr = splitArr.map(item => {
       relationQuery.limit(item.limit)
       relationQuery.skip(item.skip)
@@ -268,8 +270,7 @@ router.get('/word', basicVer, async (req, res) => {
       let customWordQuery = new AV.Query('Word')
       customWordQuery.equalTo('user', user)
       let customWordCount = await customWordQuery.count({ sessionToken })
-      let splitArrWord = split(customWordCount, 100)
-
+      let splitArr = split(customWordCount, 1000)
       let customQueryArr = splitArr.map(item => {
         customWordQuery.limit(item.limit)
         customWordQuery.skip(item.skip)
@@ -295,6 +296,39 @@ router.get('/word', basicVer, async (req, res) => {
     res.success(words.concat(custom))
   } catch (e) {
     console.log('error in get relation', e)
+    res.error(e)
+  }
+
+})
+
+router.get('/word/custom', basicVer, async (req, res) => {
+  try {
+    let custom = []
+    let { user, sessionToken } = req
+    let customWordQuery = new AV.Query('Word')
+    customWordQuery.equalTo('user', user)
+    let customWordCount = await customWordQuery.count({ sessionToken })
+    let splitArr = split(customWordCount, 1000)
+
+    let customQueryArr = splitArr.map(item => {
+      customWordQuery.limit(item.limit)
+      customWordQuery.skip(item.skip)
+      customWordQuery.descending('createdAt')
+      return customWordQuery.find({ sessionToken })
+    })
+
+    for (let i = 0; i < customQueryArr.length; i++) {
+      let result = await customQueryArr[i]
+      result.forEach(item => {
+        let { id } = item
+        let { name, comment } = item.attributes
+        custom.push({ id, name, comment })
+      })
+    }
+
+    res.success(custom)
+  } catch (e) {
+    console.log('error in get custom word', e)
     res.error(e)
   }
 
