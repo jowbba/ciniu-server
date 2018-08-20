@@ -2,14 +2,14 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-17 18:16:35
+ * @Last Modified time: 2018-08-20 10:46:24
  * @function : 条款类目
  */
 
 const router = require('express').Router()
 const AV = require('leanengine')
 const Joi = require('joi')
-const { split, getTypes, getTypeWithId, getClauseWithId, 
+const { split, getTypes, getTypeWithId, getClauseWithId,
   getWordWithId, getSameWordRelation, getSettingByUser } = require('./lib')
 const { rootVer, basicVer } = require('./middleware')
 const joiValidator = require('../../middleware/joiValidator')
@@ -76,9 +76,9 @@ router.post('/lawClause', rootVer, joiValidator({
     // 插入
     let Clause = AV.Object.extend('WordsLawClause')
     let clause = new Clause()
-    let options = { clauseId, description, type, typeName: type.attributes.typeName }
+    let options = { clauseId, description, type }
     let newClause = await clause.save(options, { sessionToken })
-    
+
     res.success(newClause)
   } catch (e) {
     console.log('error in post clause', e)
@@ -89,7 +89,7 @@ router.post('/lawClause', rootVer, joiValidator({
 // 创建词
 router.post('/word', basicVer, joiValidator({
   body: {
-    wordId: Joi.string().allow(''), 
+    wordId: Joi.string().allow(''),
     name: Joi.string().min(1).required(),
     sensitive: Joi.boolean(),
     official: Joi.boolean(),
@@ -99,7 +99,7 @@ router.post('/word', basicVer, joiValidator({
   try {
     let { user, sessionToken } = req
     let { wordId, name, sensitive, official, comment } = req.body
-    
+
     // 判断是否为官方词
     official = official || false
     if (official) {
@@ -120,7 +120,7 @@ router.post('/word', basicVer, joiValidator({
     // 插入
     let Word = AV.Object.extend('Word')
     let word = new Word()
-    let options = { wordId, name, sensitive, official, user, comment}
+    let options = { wordId, name, sensitive, official, user, comment }
     let newWord = await word.save(options, { sessionToken })
 
     res.success('')
@@ -128,12 +128,57 @@ router.post('/word', basicVer, joiValidator({
     console.log('error in post word', e)
     res.error(e)
   }
-  
+
 })
 
-router.patch('/word/id', async (req, res) => {
-  
-} )
+// 删除词
+router.delete('/word/:id', basicVer, async (req, res) => {
+  try {
+    let { sessionToken } = req
+    let { id } = req.params
+    let obj = AV.Object.createWithoutData('Word', id)
+    let result = await obj.destroy({ sessionToken })
+    res.success(result)
+  } catch (e) {
+    console.log('error in delete word', e.message)
+    res.error(e)
+  }
+})
+
+// 更新词
+router.patch('/word/:id', basicVer, joiValidator({
+  body: {
+    name: Joi.string().min(1).required(),
+    comment: Joi.string().allow('')
+  }
+}), async (req, res) => {
+  try {
+    let { sessionToken, user } = req
+    let { id } = req.params
+    let { name, comment } = req.body
+
+    // 获取词
+    let wordQuery = new AV.Query('Word')
+    wordQuery.equalTo('objectId', id)
+    let word = await wordQuery.first({ useMasterKey: true })
+    if (!word) return res.error('word not exist')
+
+    // 查询相同词
+    let sameWordQuery = new AV.Query('Word')
+    sameWordQuery.equalTo('user', user)
+    sameWordQuery.equalTo('name', name)
+    let sameNameWord = await sameWordQuery.first({ sessionToken })
+    if (sameNameWord) return res.error('exist same name custom word')
+
+    let result = await word.save({ user, name, comment }, { sessionToken })
+
+    res.success(result)
+
+  } catch (e) {
+    console.log('error in patch word', e.message)
+    res.error(e)
+  }
+})
 
 // 查询所有词
 router.get('/word', basicVer, async (req, res) => {
@@ -154,7 +199,7 @@ router.get('/word', basicVer, async (req, res) => {
 
     if (typeConditions.length) {
       let typeQuery = AV.Query.or(...typeConditions)
-      types = await typeQuery.find({sessionToken}) 
+      types = await typeQuery.find({ sessionToken })
     }
 
     console.timeEnd('type')
@@ -170,10 +215,10 @@ router.get('/word', basicVer, async (req, res) => {
 
     if (clauseCondition.length) {
       let clauseQuery = AV.Query.and(...clauseCondition)
-      clauses = await clauseQuery.find({sessionToken})
+      clauses = await clauseQuery.find({ sessionToken })
     } else {
       let clauseQuery = new AV.Query('WordsLawClause')
-      clauses = await clauseQuery.find({sessionToken})
+      clauses = await clauseQuery.find({ sessionToken })
     }
 
     console.timeEnd('clause')
@@ -189,7 +234,7 @@ router.get('/word', basicVer, async (req, res) => {
 
     let relationQuery = AV.Query.or(...relationCondition)
     relationQuery.include('word')
-    let relationCount = await relationQuery.count({sessionToken})
+    let relationCount = await relationQuery.count({ sessionToken })
 
     let splitArr = split(relationCount, 100)
     let queryArr = splitArr.map(item => {
@@ -197,47 +242,47 @@ router.get('/word', basicVer, async (req, res) => {
       relationQuery.skip(item.skip)
       relationQuery.include('word')
       relationQuery.descending('createdAt')
-      return relationQuery.find({sessionToken})
+      return relationQuery.find({ sessionToken })
     })
 
     let words = []
 
-    for(let i = 0; i < queryArr.length; i++) {
+    for (let i = 0; i < queryArr.length; i++) {
       let result = await queryArr[i]
       result.forEach(item => {
-        let { word } = item.attributes 
+        let { word } = item.attributes
         let { id } = word
         let { name } = word.attributes
         words.push({ id, name })
       })
     }
     console.timeEnd('get words')
-    
+
     // words.forEach(item => console.log(item))
 
     // 查询自定义词
     let custom = []
     console.time('custom')
-    
+
     if (customActive) {
       let customWordQuery = new AV.Query('Word')
       customWordQuery.equalTo('user', user)
-      let customWordCount = await customWordQuery.count({sessionToken})
+      let customWordCount = await customWordQuery.count({ sessionToken })
       let splitArrWord = split(customWordCount, 100)
 
       let customQueryArr = splitArr.map(item => {
         customWordQuery.limit(item.limit)
         customWordQuery.skip(item.skip)
         customWordQuery.descending('createdAt')
-        return customWordQuery.find({sessionToken})
+        return customWordQuery.find({ sessionToken })
       })
 
-      for(let i = 0; i < customQueryArr.length; i++) {
+      for (let i = 0; i < customQueryArr.length; i++) {
         let result = await customQueryArr[i]
         result.forEach(item => {
           let { id } = item
           let { name } = item.attributes
-          custom.push({ id, name})
+          custom.push({ id, name })
         })
       }
     }
@@ -268,7 +313,7 @@ router.post('/relation', rootVer, joiValidator({
     let word = await getWordWithId(wordId)
     if (!word) return res.error(`wordId : ${wordId} is not exist`)
     let clauses = []
-    for(let i = 0; i < clauseIds.length; i++) {
+    for (let i = 0; i < clauseIds.length; i++) {
       let clause = await getClauseWithId(clauseIds[i])
       if (!clause) return res.error(`clause id : ${clauseIds[i]} is not exist `)
       else clauses.push(clause)
@@ -290,43 +335,36 @@ router.post('/relation', rootVer, joiValidator({
       let options = { word, clauses }
       newRelation = await wordRelation.save(options, { sessionToken })
     }
-    
+
     res.success(newRelation)
-    
+
   } catch (e) {
     console.log('error in get word', e.message)
     res.error(e)
   }
 })
 
-// 查询词的类目或解释
+// 根据ID 查询词对应条款
 router.get('/word/:id', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
     let { id } = req.params
+    console.log(id)
     let wordQuery = new AV.Query('Word')
     wordQuery.equalTo('objectId', id)
     let word = await wordQuery.first({ sessionToken })
     if (!word) return res.error('not exist')
-    let { official, comment, name, sensitive } = word.attributes
-    // console.log(word.attributes)
+
+    let { official, comment, name } = word.attributes
     let result = []
     if (official) {
-      // 查询词对应条款
-      let relationQuery = new AV.Query('WordsRelation')
-      relationQuery.equalTo('word', word)
-      relationQuery.include('clauses')
-      let relation = await relationQuery.first({ sessionToken })
-      relation.attributes.clauses.forEach(item => {
-        let { description, typeName } = item.attributes
-        result.push({ name, sensitive, data: description, official, typeName })
-      })
+      let
     } else {
-      // 自建词 不包含条款
-      result.push({ name, sensitive, data: comment, official, typeName: ''})
+
     }
-    
-    res.success(result)
+
+
+
 
   } catch (e) {
     console.log('error in get word info', e.message)
