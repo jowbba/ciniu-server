@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-17 18:16:35
+ * @Last Modified time: 2018-08-21 11:03:47
  * @function : 条款类目
  */
 
@@ -304,12 +304,13 @@ router.get('/word/:id', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
     let { id } = req.params
+    console.log(`id is : ${id}`)
     let wordQuery = new AV.Query('Word')
     wordQuery.equalTo('objectId', id)
     let word = await wordQuery.first({ sessionToken })
     if (!word) return res.error('not exist')
     let { official, comment, name, sensitive } = word.attributes
-    // console.log(word.attributes)
+    
     let result = []
     if (official) {
       // 查询词对应条款
@@ -319,11 +320,11 @@ router.get('/word/:id', basicVer, async (req, res) => {
       let relation = await relationQuery.first({ sessionToken })
       relation.attributes.clauses.forEach(item => {
         let { description, typeName } = item.attributes
-        result.push({ name, sensitive, data: description, official, typeName })
+        result.push({ name, sensitive, data: description, official, typeName,  uTime: word.updatedAt })
       })
     } else {
       // 自建词 不包含条款
-      result.push({ name, sensitive, data: comment, official, typeName: ''})
+      result.push({ name, sensitive, data: comment, official, typeName: '', uTime: word.updatedAt})
     }
     
     res.success(result)
