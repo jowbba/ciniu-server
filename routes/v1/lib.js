@@ -38,6 +38,29 @@ module.exports = {
     res.status(code).json({ message })
   },
 
+  getWords: (word) => {
+    try {
+      let words = []
+
+      for (let i in word) {
+        for(let j = i; j < word.length; j++) {
+          if ( j - i > 8) continue
+          words.push({ 
+            name: word.slice(i, Number(j) + 1),
+            begin: Number(i) + 1,
+            length: Number(j) - Number(i) + 1
+          })
+        }
+      }
+
+      let map = new Map()
+      words.forEach(word => map.set(word.name, word))
+      return [...map.values()]
+    } catch (e) {
+      throw(e)
+    }
+  },
+
   // 通过用户名获取用户对象(root)
   getUserWithRoot: async (username) => {
     let userQuery = new AV.Query('_User')

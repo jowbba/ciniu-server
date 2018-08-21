@@ -2,11 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
-<<<<<<< HEAD
- * @Last Modified time: 2018-08-21 11:03:47
-=======
- * @Last Modified time: 2018-08-21 11:21:40
->>>>>>> 01ca272c9f31acfdb61ec8392faaf29035dd63d8
+ * @Last Modified time: 2018-08-21 19:00:36
  * @function : 条款类目
  */
 
@@ -14,7 +10,7 @@ const router = require('express').Router()
 const AV = require('leanengine')
 const Joi = require('joi')
 const { split, getTypes, getTypeWithId, getClauseWithId,
-  getWordWithId, getSameWordRelation, getSettingByUser } = require('./lib')
+  getWordWithId, getSameWordRelation, getSettingByUser, getWords } = require('./lib')
 const { rootVer, basicVer } = require('./middleware')
 const joiValidator = require('../../middleware/joiValidator')
 
@@ -80,7 +76,7 @@ router.post('/lawClause', rootVer, joiValidator({
     // 插入
     let Clause = AV.Object.extend('WordsLawClause')
     let clause = new Clause()
-    let options = { clauseId, description, type }
+    let options = { clauseId, description, type, typeName: type.attributes.typeName }
     let newClause = await clause.save(options, { sessionToken })
 
     res.success(newClause)
@@ -88,6 +84,12 @@ router.post('/lawClause', rootVer, joiValidator({
     console.log('error in post clause', e)
     res.error(e)
   }
+})
+
+// 点赞
+router.post('/lawClause/thumbUp', async (req, res) => {
+  let { clauseId } = req.body
+  let 
 })
 
 // 创建词
@@ -361,12 +363,12 @@ router.post('/relation', rootVer, joiValidator({
     // 相同word 是否存在
     let sameWordIdRelation = await getSameWordRelation(word)
     if (sameWordIdRelation) {
-      console.log('exist same wordId relation --> update')
+      // console.log('exist same wordId relation --> update')
       // 更新
       clauses.forEach(clause => sameWordIdRelation.addUnique('clauses', clause))
       newRelation = await sameWordIdRelation.save({}, { sessionToken })
     } else {
-      console.log('not exist same wordId relation --> insert')
+      // console.log('not exist same wordId relation --> insert')
       // 插入
       let WordRelation = AV.Object.extend('WordsRelation')
       let wordRelation = new WordRelation()
@@ -418,6 +420,82 @@ router.get('/word/:id', basicVer, async (req, res) => {
     res.error(e)
   }
 })
+
+router.post('/freeQuery', joiValidator({
+  body: {
+    word: Joi.string().max(6).required()
+  }
+}), async (req, res) => {
+  try {
+    let { word } = req.body
+    let words = getWords(word)
+    let result = []
+    // 查询条件
+    let conditions = words.map(word => {
+      let wordQuery = new AV.Query('Word')
+      wordQuery.equalTo('official', true)
+      wordQuery.equalTo('name', word.name)
+      return wordQuery
+    })
+
+    let query = AV.Query.or(...conditions)
+    let wordResult = await query.find({useMasterKey: true})
+    // 排序
+    wordResult.forEach(item => {
+      let i = words.find(word => word.name == item.attributes.name)
+      item.begin = i.begin
+      item.length = i.length
+    })
+    wordResult.sort(by('begin', 'length'))
+
+    // 未找到违禁词
+    if (wordResult.length == 0) return res.error('该词未被收录')
+    
+    // 找到违禁词对应条款与类目
+    for(let i of wordResult) {
+      let { name, sensitive } = i.attributes
+      let word = { name, clauses: []}
+      // 敏感词 结束查询
+      if (sensitive) return res.error('未能通过词牛的智能审核。')
+      
+      // 查询对应条款
+      let relationQuery = new AV.Query('WordsRelation')
+      relationQuery.equalTo('word', i)
+      relationQuery.include('clauses')
+      let relation = await relationQuery.first({ useMasterKey: true })
+      relation.attributes.clauses.forEach(item => {
+        let { description, typeName, clauseId, thumbUp } = item.attributes
+        word.clauses.push({ description, typeName, clauseId, thumbUp })
+      })
+
+      result.push(word)
+    }
+
+    res.success(result)
+  } catch (e) {
+    console.log('error in get free word info', e.message)
+    res.error('该词未被收录')
+  }
+})
+
+var by = function(name,minor){
+   return function(o,p){
+     var a,b;
+     if(o && p && typeof o === 'object' && typeof p ==='object'){
+       a = o[name];
+       b = p[name];
+       if(a === b){
+         return typeof minor === 'function' ? minor(o,p):0;
+       }
+       if(typeof a === typeof b){
+         return a < b ? -1:1;
+       }
+       return typeof a < typeof b ? -1 : 1;
+     }else{
+       thro("error");
+     }
+   }
+  }
 
 
 module.exports = router

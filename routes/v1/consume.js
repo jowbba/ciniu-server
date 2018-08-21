@@ -7,8 +7,8 @@ var { basicVer } = require('./middleware')
 router.post('/', basicVer, async (req, res) => {
   try {
     // 查询用户角色
-    let { user, sessionToken, fileName } = req
-    let { count } = req.body
+    let { user, sessionToken } = req
+    let { count, taskId, fileName } = req.body
     if (!user) throw createErr('user not exist', 403)
     if (!count) throw createErr('count is required', 400)
     if (typeof count !== 'number' || count < 0) throw createErr('count should be number', 400)
@@ -47,7 +47,7 @@ router.post('/', basicVer, async (req, res) => {
 
 
     await record.save(
-      { type, username, count, pointsToConsume, actualPoints, toAccountWords, describe, fileName },
+      { type, username, count, pointsToConsume, actualPoints, toAccountWords, describe, fileName, taskId },
       { sessionToken })
 
     res.status(200).json(user)
