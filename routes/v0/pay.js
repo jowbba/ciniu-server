@@ -185,7 +185,7 @@ const pointList = [
   {price: 98, count: 10000},
   {price: 180, count: 20000},
   {price: 350, count: 40000},
-  {price: 1000, count: 120000}
+  {price: 999, count: 120000}
 ]
 
 const typeList = [

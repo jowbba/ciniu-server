@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-22 15:17:39
+ * @Last Modified time: 2018-08-22 17:35:44
  * @function : 条款类目
  */
 
@@ -389,7 +389,6 @@ router.get('/word/:id', basicVer, async (req, res) => {
   try {
     let { user, sessionToken } = req
     let { id } = req.params
-    console.log(`id is : ${id}`)
     let wordQuery = new AV.Query('Word')
     wordQuery.equalTo('objectId', id)
     let word = await wordQuery.first({ sessionToken })

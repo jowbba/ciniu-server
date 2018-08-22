@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:51:59 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-17 12:03:18
+ * @Last Modified time: 2018-08-22 17:35:21
  */
 
 var router = require('express').Router()
@@ -14,7 +14,6 @@ router.get('/', basicVer, async (req, res) => {
   try {
     let settingObj = await getSettingByUser(req.user)
     let result = settingObj.attributes
-    console.log(result)
     let { notSelectedType } = result
     result.types = []
     // 获取types
