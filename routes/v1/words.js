@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-21 19:00:36
+ * @Last Modified time: 2018-08-22 15:17:39
  * @function : 条款类目
  */
 
@@ -131,7 +131,7 @@ router.post('/word', basicVer, joiValidator({
 
     res.success('')
   } catch (e) {
-    console.log('error in post word', e)
+    console.log(`error in post word ${req.body.wordId}`, e)
     res.error(e)
   }
 
@@ -379,7 +379,7 @@ router.post('/relation', rootVer, joiValidator({
     res.success(newRelation)
 
   } catch (e) {
-    console.log('error in get word', e.message)
+    console.log(`error in post relation ${req.body.wordId}`, e.message)
     res.error(e)
   }
 })
