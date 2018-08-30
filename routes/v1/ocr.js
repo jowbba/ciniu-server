@@ -78,7 +78,7 @@ router.post('/', basicVer, async (req, res) => {
       } else if ( !!sameHashOcr) {
         console.log('找到相同OCR 但不是本用户记录 扣点')
         needToQuery = false
-        needToConsume = false
+        needToConsume = true
         fileResult = sameHashOcr.attributes.file
         result = sameHashOcr.attributes.result
         url = sameHashOcr.attributes.url

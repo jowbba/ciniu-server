@@ -168,8 +168,8 @@ router.post('/pwdcode', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length == 0) throw createErr('用户不存在', 200)
     await AV.User.requestPasswordResetBySmsCode(username)
-    createResult(res, result)
-    // res.status(200).json({ message: 'ok', state: true, code: 200, result: ''})
+    // createResult(res, result)
+    res.status(200).json({ message: 'ok', state: true, code: 200, result: ''})
   } catch (e) {
     console.log(e.message, 'in pwdcode')
     createErr(res, e)

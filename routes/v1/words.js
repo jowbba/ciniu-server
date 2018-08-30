@@ -2,17 +2,19 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-30 12:27:01
+ * @Last Modified time: 2018-08-30 16:02:39
  * @function : 条款类目
  */
 
 const router = require('express').Router()
 const AV = require('leanengine')
 const Joi = require('joi')
+const Excel = require('exceljs')
 const { split, getTypes, getTypeWithId, getClauseWithId, freeWordRecord,
   getWordWithId, getSameWordRelation, getSettingByUser, getWords } = require('./lib')
 const { rootVer, basicVer } = require('./middleware')
 const joiValidator = require('../../middleware/joiValidator')
+const path = require('path')
 
 
 // 创建类目
@@ -426,17 +428,26 @@ router.get('/word/:id', basicVer, async (req, res) => {
   }
 })
 
+// 免费查询
 router.post('/freeQuery', joiValidator({
   body: {
     word: Joi.string().max(6).required()
   }
 }), async (req, res) => {
   try {
+    var publicAddress
+	  var headers = req.headers
+	  var forwardedIpsStr = headers['x-real-ip'] || headers['x-forwarded-for']
+    forwardedIpsStr ? publicAddress = forwardedIpsStr : publicAddress = null
+
+    let ip = req.ip.split(':')
+    let intranetAddress = ip[ip.length - 1]
+
     let { word } = req.body
     let words = getWords(word)
     let result = []
     // 记录
-    await freeWordRecord(word)
+    await freeWordRecord(word, publicAddress, intranetAddress)
     // 查询条件
     let conditions = words.map(word => {
       let wordQuery = new AV.Query('Word')
@@ -478,8 +489,6 @@ router.post('/freeQuery', joiValidator({
       result.push(word)
     }
 
-    
-
     res.success(result)
   } catch (e) {
     console.log('error in get free word info', e.message)
@@ -487,34 +496,51 @@ router.post('/freeQuery', joiValidator({
   }
 })
 
-// router.get('/test', async (req, res) => {
-  
-//   let relationQuery = new AV.Query('WordsRelation')
-//   let relationCount = await relationQuery.count({ useMasterKey: true })
-//   let splitArr = split(relationCount, 1000)
-//   let queryArr = splitArr.map(item => {
-//     relationQuery.limit(item.limit)
-//     relationQuery.skip(item.skip)
-//     relationQuery.include('word')
-//     relationQuery.descending('createdAt')
-//     return relationQuery.find({ useMasterKey: true })
-//   })
+// 免费查询记录
+router.get('/freeQueryRecord', async (req, res) => {
+  try {
+    let time = (new Date()).getTime()
+    let query = new AV.Query('FreeWordQueryRecord')
+    let count = await query.count({ useMasterKey: true})
+    let splitArr = split(count, 1000)
+    let recordsQuery = splitArr.map(item => {
+      query.limit(item.limit)
+      query.skip(item.skip)
+      query.descending('createdAt')
+      return query.find({ useMasterKey: true })
+    })
+    
+    let results = []
+    for (let i of recordsQuery) {
+      let result = await i
+      results = results.concat(result)
+    }
 
-//   let words = []
+    var workbook = new Excel.Workbook()
+    var ws1 = workbook.addWorksheet('全部')
+    ws1.addRow(['名称', '公网IP', '时间'])
 
-//   for (let i = 0; i < queryArr.length; i++) {
-//     let result = await queryArr[i]
-//     result.forEach(item => {
-//       let { word } = item.attributes
-//       let { wordId } = word.attributes
-//       words.push(wordId)
-//     })
-//   }
+    results.forEach(item => {
+      let { name, publicAddress } = item.attributes
+      ws1.addRow([name, publicAddress, item.createdAt])
+    })
 
-//   res.status(200).json(words)
+    let filePath = path.join('/tmp', `${time}.xlsx`)
+    await workbook.xlsx.writeFile(filePath)
+
+    res.header('Content-Type', 'application/octet-stream')
+    res.header('Content-Disposition', `attachment; filename=${time}.xlsx`)
+    res.sendFile(filePath)
+    
 
 
-// })
+
+  } catch (e) {
+    console.log(e)
+    res.error(e)
+  }
+})
+
 
 var by = function (name, minor) {
   return function (o, p) {
