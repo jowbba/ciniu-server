@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-23 13:05:41
+ * @Last Modified time: 2018-08-30 12:27:01
  * @function : 条款类目
  */
 
@@ -233,16 +233,22 @@ router.get('/word', basicVer, async (req, res) => {
 
     // 查询需要的词
     console.time('get words')
-
+    
     let relationCondition = clauses.map(clause => {
       let relationQuery = new AV.Query('WordsRelation')
       relationQuery.equalTo('clauses', clause)
       return relationQuery
     })
 
-    let relationQuery = AV.Query.or(...relationCondition)
-    relationQuery.include('word')
-    let relationCount = await relationQuery.count({ sessionToken })
+    let relationCount = 0
+    let relationQuery
+    if (relationCondition.length !== 0) {
+      relationQuery = AV.Query.or(...relationCondition)
+      relationQuery.include('word')
+      relationCount = await relationQuery.count({ sessionToken })
+    }
+
+    
 
     let splitArr = split(relationCount, 1000)
     let queryArr = splitArr.map(item => {

@@ -155,8 +155,8 @@ router.post('/', async (req, res) => {
   } catch (e) {
     console.log(e.message, 'in register')
     createErr(res, e)
-    // let message = e.rawMessage?e.rawMessage:e.message
-    // res.status(200).json({ message, state: false, code: 200, result: '' })
+    let message = e.rawMessage?e.rawMessage:e.message
+    res.status(200).json({ message, state: false, code: 200, result: '' })
   }
 })
 
@@ -173,8 +173,8 @@ router.post('/pwdcode', async (req, res) => {
   } catch (e) {
     console.log(e.message, 'in pwdcode')
     createErr(res, e)
-    // let message = e.rawMessage?e.rawMessage:e.message
-    // res.status(200).json({ message, state: false, code: 200, result: '' })
+    let message = e.rawMessage?e.rawMessage:e.message
+    res.status(200).json({ message, state: false, code: 200, result: '' })
   }
 })
 
@@ -195,7 +195,7 @@ router.post('/password', async (req, res) => {
     recordQuery.equalTo('active', true)
     let roles = await recordQuery.find({useMasterKey: true})
     let sessionToken = user.getSessionToken()
-    let result = JSON.stringify(Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, points, roles, count}))
+    let result = Object.assign({},JSON.parse(JSON.stringify(user)), {sessionToken, points, roles, count})
 
     createResult(res, result)
     // res.status(200).json({state: true, code: 200, message: 'ok', result})

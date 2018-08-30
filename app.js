@@ -38,7 +38,7 @@ app.use(logger('combined',{stream:accessLogStream}));//写入日志文件
 
 
 // 设置默认超时时间
-app.use(timeout('600s'));
+app.use(timeout('60s'));
 
 // 加载云引擎中间件
 app.use(AV.express());
@@ -111,6 +111,7 @@ app.use(function(err, req, res, next) {
   }
   if (req.timedout) {
     console.error('请求超时: url=%s, timeout=%d, 请确认方法执行耗时很长，或没有正确的 response 回调。', req.originalUrl, err.timeout);
+    res.error('请求超时')
   }
   res.status(statusCode);
   // 默认不输出异常详情
