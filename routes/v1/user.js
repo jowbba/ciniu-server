@@ -121,7 +121,7 @@ router.post('/code', async (req, res) => {
     let existUser = await getUserWithRoot(username)
     if (existUser.length > 0) throw createErr('用户已存在', 200)
     await AV.Cloud.requestSmsCode(username)
-    res.success('')
+    res.status(200).json({ message: 'ok', result: '', state: true, code: 200})
   } catch (e) {
     console.log(e.message, 'in code')
     res.error(e)
@@ -149,7 +149,7 @@ router.post('/', async (req, res) => {
     recordQuery.equalTo('username', username)
     recordQuery.equalTo('active', true)
     let roles = await recordQuery.find({useMasterKey: true})
-    let result = JSON.stringify(Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken, roles}))
+    let result = Object.assign({}, JSON.parse(JSON.stringify(newUser)), {sessionToken, roles})
     createResult(res, result)
     // res.status(200).json({state: true, code: 200, message: 'ok', result})
   } catch (e) {

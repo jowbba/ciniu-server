@@ -301,6 +301,27 @@ module.exports = {
     let relationQuery = new AV.Query('WordsRelation')
     relationQuery.equalTo('word', word)
     return relationQuery.first({ useMasterKey })
+  },
+
+  freeWordRecord: async (name) => {
+    try {
+      let sameWordRecordQuery = new AV.Query('FreeWordQueryRecord')
+      sameWordRecordQuery.equalTo('name', name)
+      let sameWord = await sameWordRecordQuery.first({ useMasterKey })
+      if (sameWord) {
+        // console.log('exist sameName word')
+        sameWord.increment('count', 1)
+        await sameWord.save({}, { useMasterKey })
+      } else {
+        // console.log('not exist sameName word')
+        let Record = AV.Object.extend('FreeWordQueryRecord')
+        let record = new Record()
+        record.set('name', name)
+        await record.save({ useMasterKey })
+      }
+    } catch (e) {
+      console.log('error in free word record', e.message)
+    }
   }
 }
 

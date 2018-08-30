@@ -2,14 +2,14 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-22 17:35:44
+ * @Last Modified time: 2018-08-23 13:05:41
  * @function : 条款类目
  */
 
 const router = require('express').Router()
 const AV = require('leanengine')
 const Joi = require('joi')
-const { split, getTypes, getTypeWithId, getClauseWithId,
+const { split, getTypes, getTypeWithId, getClauseWithId, freeWordRecord,
   getWordWithId, getSameWordRelation, getSettingByUser, getWords } = require('./lib')
 const { rootVer, basicVer } = require('./middleware')
 const joiValidator = require('../../middleware/joiValidator')
@@ -89,7 +89,7 @@ router.post('/lawClause', rootVer, joiValidator({
 // 点赞
 router.post('/lawClause/thumbUp', async (req, res) => {
   let { clauseId } = req.body
-  let 
+  let
 })
 
 // 创建词
@@ -394,7 +394,7 @@ router.get('/word/:id', basicVer, async (req, res) => {
     let word = await wordQuery.first({ sessionToken })
     if (!word) return res.error('not exist')
     let { official, comment, name, sensitive } = word.attributes
-    
+
     let result = []
     if (official) {
       // 查询词对应条款
@@ -404,11 +404,11 @@ router.get('/word/:id', basicVer, async (req, res) => {
       let relation = await relationQuery.first({ sessionToken })
       relation.attributes.clauses.forEach(item => {
         let { description, typeName } = item.attributes
-        result.push({ name, sensitive, data: description, official, typeName,  uTime: word.updatedAt })
+        result.push({ name, sensitive, data: description, official, typeName, uTime: word.updatedAt })
       })
     } else {
       // 自建词 不包含条款
-      result.push({ name, sensitive, data: comment, official, typeName: '', uTime: word.updatedAt})
+      result.push({ name, sensitive, data: comment, official, typeName: '', uTime: word.updatedAt })
     }
 
     res.success(result)
@@ -429,6 +429,8 @@ router.post('/freeQuery', joiValidator({
     let { word } = req.body
     let words = getWords(word)
     let result = []
+    // 记录
+    await freeWordRecord(word)
     // 查询条件
     let conditions = words.map(word => {
       let wordQuery = new AV.Query('Word')
@@ -438,7 +440,7 @@ router.post('/freeQuery', joiValidator({
     })
 
     let query = AV.Query.or(...conditions)
-    let wordResult = await query.find({useMasterKey: true})
+    let wordResult = await query.find({ useMasterKey: true })
     // 排序
     wordResult.forEach(item => {
       let i = words.find(word => word.name == item.attributes.name)
@@ -449,14 +451,14 @@ router.post('/freeQuery', joiValidator({
 
     // 未找到违禁词
     if (wordResult.length == 0) return res.error('该词未被收录')
-    
+
     // 找到违禁词对应条款与类目
-    for(let i of wordResult) {
+    for (let i of wordResult) {
       let { name, sensitive } = i.attributes
-      let word = { name, clauses: []}
+      let word = { name, clauses: [] }
       // 敏感词 结束查询
       if (sensitive) return res.error('未能通过词牛的智能审核。')
-      
+
       // 查询对应条款
       let relationQuery = new AV.Query('WordsRelation')
       relationQuery.equalTo('word', i)
@@ -470,6 +472,8 @@ router.post('/freeQuery', joiValidator({
       result.push(word)
     }
 
+    
+
     res.success(result)
   } catch (e) {
     console.log('error in get free word info', e.message)
@@ -477,24 +481,53 @@ router.post('/freeQuery', joiValidator({
   }
 })
 
-var by = function(name,minor){
-   return function(o,p){
-     var a,b;
-     if(o && p && typeof o === 'object' && typeof p ==='object'){
-       a = o[name];
-       b = p[name];
-       if(a === b){
-         return typeof minor === 'function' ? minor(o,p):0;
-       }
-       if(typeof a === typeof b){
-         return a < b ? -1:1;
-       }
-       return typeof a < typeof b ? -1 : 1;
-     }else{
-       thro("error");
-     }
-   }
+// router.get('/test', async (req, res) => {
+  
+//   let relationQuery = new AV.Query('WordsRelation')
+//   let relationCount = await relationQuery.count({ useMasterKey: true })
+//   let splitArr = split(relationCount, 1000)
+//   let queryArr = splitArr.map(item => {
+//     relationQuery.limit(item.limit)
+//     relationQuery.skip(item.skip)
+//     relationQuery.include('word')
+//     relationQuery.descending('createdAt')
+//     return relationQuery.find({ useMasterKey: true })
+//   })
+
+//   let words = []
+
+//   for (let i = 0; i < queryArr.length; i++) {
+//     let result = await queryArr[i]
+//     result.forEach(item => {
+//       let { word } = item.attributes
+//       let { wordId } = word.attributes
+//       words.push(wordId)
+//     })
+//   }
+
+//   res.status(200).json(words)
+
+
+// })
+
+var by = function (name, minor) {
+  return function (o, p) {
+    var a, b;
+    if (o && p && typeof o === 'object' && typeof p === 'object') {
+      a = o[name];
+      b = p[name];
+      if (a === b) {
+        return typeof minor === 'function' ? minor(o, p) : 0;
+      }
+      if (typeof a === typeof b) {
+        return a < b ? -1 : 1;
+      }
+      return typeof a < typeof b ? -1 : 1;
+    } else {
+      thro("error");
+    }
   }
+}
 
 
 module.exports = router
