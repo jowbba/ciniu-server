@@ -253,7 +253,7 @@ module.exports = {
         let setting = new Setting()
         setting.set('imageActive', true)
         setting.set('customActive', true)
-        setting.set('notSelectedType', [])
+        setting.set('notSelectedType', ['T13'])
         setting.set('username', username)
         result = await setting.save({}, { sessionToken, fetchWhenSave: true })
       }

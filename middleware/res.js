@@ -46,14 +46,15 @@ module.exports = (req, res, next) => {
     })
   }
 
-  res.error = (err, status) => {
+  res.error = (err, status, code) => {
 
     if (typeof err == 'string') err = new Error(err)
 
     status = status || 200
+    code = code || 200
     let message = !!err.rawMessage? err.rawMessage: err.message
     res.status(status).json({ 
-      code: 200, 
+      code, 
       message, 
       result: '', 
       state: false

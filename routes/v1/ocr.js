@@ -51,14 +51,14 @@ router.post('/', basicVer, async (req, res) => {
     
     if (needToUpload) {
       // 没找到相同文件 -> 存储文件
-      console.log('没找到相同文件 -> 存储文件')
+      // console.log('没找到相同文件 -> 存储文件')
       let data = { base64: image }
       let file = new AV.File(hash, data)
       file.metaData('owner', user.id)
       fileResult = await file.save()
       url = fileResult.url()
     } else {
-      console.log('找到相同文件')
+      // console.log('找到相同文件')
       // 找到相同文件 -> 查找记录
       let ocrQuery = new AV.Query('OcrRecord')
       ocrQuery.equalTo('hash', hash)
@@ -67,16 +67,16 @@ router.post('/', basicVer, async (req, res) => {
       let sameHashAndUserOcr = await ocrQuery.first({useMasterKey: true})
       
       if ( !sameHashOcr && !sameHashAndUserOcr) {
-        console.log('没有找到OCR记录')
+        // console.log('没有找到OCR记录')
       } else if ( !!sameHashAndUserOcr) {
-        console.log('找到相同OCR 且用户相同记录 不扣点')
+        // console.log('找到相同OCR 且用户相同记录 不扣点')
         needToQuery = false
         needToConsume = false
         fileResult = sameHashAndUserOcr.attributes.file
         result = sameHashAndUserOcr.attributes.result
         url = sameHashAndUserOcr.attributes.url
       } else if ( !!sameHashOcr) {
-        console.log('找到相同OCR 但不是本用户记录 扣点')
+        // console.log('找到相同OCR 但不是本用户记录 扣点')
         needToQuery = false
         needToConsume = true
         fileResult = sameHashOcr.attributes.file

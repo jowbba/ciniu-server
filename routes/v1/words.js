@@ -2,7 +2,7 @@
  * @Author: harry.liu 
  * @Date: 2018-08-16 11:54:36 
  * @Last Modified by: harry.liu
- * @Last Modified time: 2018-08-30 16:02:39
+ * @Last Modified time: 2018-09-06 10:36:24
  * @function : 条款类目
  */
 
@@ -41,7 +41,7 @@ router.post('/type', rootVer, joiValidator({
     let newType = await type.save(options, { sessionToken })
     res.success(newType)
   } catch (e) {
-    console.log('error in post type', e)
+    console.error('error in post type', e)
     res.error(e)
   }
 
@@ -53,7 +53,7 @@ router.get('/type', basicVer, async (req, res) => {
     let data = await getTypes()
     res.success(data)
   } catch (e) {
-    console.log('error in get type', e)
+    console.error('error in get type', e)
     res.error(e)
   }
 })
@@ -83,7 +83,7 @@ router.post('/lawClause', rootVer, joiValidator({
 
     res.success(newClause)
   } catch (e) {
-    console.log('error in post clause', e)
+    console.error('error in post clause', e)
     res.error(e)
   }
 })
@@ -91,7 +91,7 @@ router.post('/lawClause', rootVer, joiValidator({
 // 点赞
 router.post('/lawClause/thumbUp', async (req, res) => {
   let { clauseId } = req.body
-  let
+  // let
 })
 
 // 创建词
@@ -122,7 +122,7 @@ router.post('/word', basicVer, joiValidator({
       wordQuery.equalTo('user', user)
       wordQuery.equalTo('name', name)
       let sameNameWord = await wordQuery.first({ sessionToken })
-      if (sameNameWord) return res.error('exist same name custom word')
+      if (sameNameWord) return res.error('exist same name custom word', 200, 409)
     }
 
     // 插入
@@ -133,7 +133,7 @@ router.post('/word', basicVer, joiValidator({
 
     res.success('')
   } catch (e) {
-    console.log(`error in post word ${req.body.wordId}`, e)
+    console.error(`error in post word ${req.body.wordId}`, e)
     res.error(e)
   }
 
@@ -148,7 +148,7 @@ router.delete('/word/:id', basicVer, async (req, res) => {
     let result = await obj.destroy({ sessionToken })
     res.success(result)
   } catch (e) {
-    console.log('error in delete word', e.message)
+    console.error('error in delete word', e.message)
     res.error(e)
   }
 })
@@ -184,7 +184,7 @@ router.patch('/word/:id', basicVer, joiValidator({
     res.success(result)
 
   } catch (e) {
-    console.log('error in patch word', e.message)
+    console.error('error in patch word', e.message)
     res.error(e)
   }
 })
@@ -192,13 +192,14 @@ router.patch('/word/:id', basicVer, joiValidator({
 // 查询所有词
 router.get('/word', basicVer, async (req, res) => {
   try {
+    console.time('get words')
     let { user, sessionToken } = req
-    console.time('setting')
+    // console.time('setting')
     let setting = await getSettingByUser(user)
-    console.timeEnd('setting')
+    // console.timeEnd('setting')
     let { notSelectedType, customActive } = setting.attributes
     // 获取不需要的type
-    console.time('type')
+    // console.time('type')
     let types = []
     let typeConditions = notSelectedType.map(typeId => {
       let typeQuery = new AV.Query('WordsType')
@@ -211,10 +212,10 @@ router.get('/word', basicVer, async (req, res) => {
       types = await typeQuery.find({ sessionToken })
     }
 
-    console.timeEnd('type')
+    // console.timeEnd('type')
 
     // 获取需要的条款
-    console.time('clause')
+    // console.time('clause')
     let clauses = []
     let clauseCondition = types.map(type => {
       let clauseQuery = new AV.Query('WordsLawClause')
@@ -231,10 +232,10 @@ router.get('/word', basicVer, async (req, res) => {
       clauses = await clauseQuery.find({ sessionToken })
     }
 
-    console.timeEnd('clause')
+    // console.timeEnd('clause')
 
     // 查询需要的词
-    console.time('get words')
+    // console.time('get words')
     
     let relationCondition = clauses.map(clause => {
       let relationQuery = new AV.Query('WordsRelation')
@@ -272,13 +273,13 @@ router.get('/word', basicVer, async (req, res) => {
         words.push({ id, name })
       })
     }
-    console.timeEnd('get words')
+    // console.timeEnd('get words')
 
     // words.forEach(item => console.log(item))
 
     // 查询自定义词
     let custom = []
-    console.time('custom')
+    // console.time('custom')
 
     if (customActive) {
       let customWordQuery = new AV.Query('Word')
@@ -302,14 +303,15 @@ router.get('/word', basicVer, async (req, res) => {
       }
     }
 
-    console.timeEnd('custom')
+    // console.timeEnd('custom')
     console.log(`Get all word finish, official words : ${words.length}
       custom words : ${custom.length}`)
 
+      console.timeEnd('get words')
 
     res.success(words.concat(custom))
   } catch (e) {
-    console.log('error in get relation', e)
+    console.error('error in get relation', e)
     res.error(e)
   }
 
@@ -342,7 +344,7 @@ router.get('/word/custom', basicVer, async (req, res) => {
 
     res.success(custom)
   } catch (e) {
-    console.log('error in get custom word', e)
+    console.error('error in get custom word', e)
     res.error(e)
   }
 
@@ -387,7 +389,7 @@ router.post('/relation', rootVer, joiValidator({
     res.success(newRelation)
 
   } catch (e) {
-    console.log(`error in post relation ${req.body.wordId}`, e.message)
+    console.error(`error in post relation ${req.body.wordId}`, e.message)
     res.error(e)
   }
 })
@@ -423,7 +425,7 @@ router.get('/word/:id', basicVer, async (req, res) => {
 
 
   } catch (e) {
-    console.log('error in get word info', e.message)
+    console.error('error in get word info', e.message)
     res.error(e)
   }
 })
@@ -491,7 +493,7 @@ router.post('/freeQuery', joiValidator({
 
     res.success(result)
   } catch (e) {
-    console.log('error in get free word info', e.message)
+    console.error('error in get free word info', e.message)
     res.error('该词未被收录')
   }
 })
@@ -506,7 +508,7 @@ router.get('/freeQueryRecord', async (req, res) => {
     let recordsQuery = splitArr.map(item => {
       query.limit(item.limit)
       query.skip(item.skip)
-      query.descending('createdAt')
+      query.descending('publicAddress')
       return query.find({ useMasterKey: true })
     })
     
@@ -536,9 +538,38 @@ router.get('/freeQueryRecord', async (req, res) => {
 
 
   } catch (e) {
-    console.log(e)
+    console.error(e)
     res.error(e)
   }
+})
+
+router.get('/test', async (req, res) => {
+  
+  let relationQuery = new AV.Query('WordsRelation')
+  let relationCount = await relationQuery.count({ useMasterKey: true })
+  let splitArr = split(relationCount, 1000)
+  let queryArr = splitArr.map(item => {
+    relationQuery.limit(item.limit)
+    relationQuery.skip(item.skip)
+    relationQuery.include('word')
+    relationQuery.descending('createdAt')
+    return relationQuery.find({ useMasterKey: true })
+  })
+
+  let words = []
+
+  for (let i = 0; i < queryArr.length; i++) {
+    let result = await queryArr[i]
+    result.forEach(item => {
+      let { word } = item.attributes
+      let { wordId } = word.attributes
+      words.push(wordId)
+    })
+  }
+
+  res.status(200).json(words)
+
+
 })
 
 
@@ -556,10 +587,12 @@ var by = function (name, minor) {
       }
       return typeof a < typeof b ? -1 : 1;
     } else {
-      thro("error");
+      throw new Error("error");
     }
   }
 }
+
+
 
 
 module.exports = router
