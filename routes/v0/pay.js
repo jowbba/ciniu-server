@@ -101,7 +101,7 @@ router.post('/notify', async (req, res) => {
     // } else {
     //   return res.status(200).json({message: 'bad request !@#$%^&*'})
     // }
-
+    res.status(200).json({message: 'ok'})
   // 更新交易信息
   } catch (e) {
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
