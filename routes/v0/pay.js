@@ -14,8 +14,8 @@ const gateway = 'https://openapi.alipay.com/gateway.do'
 var ali = new Alipay({
   appId: '2018062760432332',
   notifyUrl: 'http://ciniu.leanapp.cn/pay/notify',
-  rsaPrivate: path.join(__dirname, '../RSA/2.txt'),
-  rsaPublic: path.join(__dirname, '../RSA/3.txt'),
+  rsaPrivate: path.join(__dirname, '../RSA/private_key.txt'),
+  rsaPublic: path.join(__dirname, '../RSA/alipay_public_key.txt'),
   sandbox: false,
   signType: 'RSA2'
 });
@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
 
     let result = await trade.save({username, price, annualCount, points, describe, status: '', invoiceClassify, invoiceType, invoiceTitle, invoiceId, address, email, name, phone, code, pay}, {useMasterKey: true})
 
-    if (user.attributes.username == '13585723915') price = 0.1
+    if (user.attributes.username == '13621766832') price = 0.1
     
     var params = ali.pagePay({
       subject: '词牛充值',
@@ -92,16 +92,15 @@ router.post('/notify', async (req, res) => {
     let queryResult = await ali.query({outTradeId:out_trade_no})
     let ok = ali.signVerify(queryResult.json())
     if (!ok) return res.status(200).json({message: 'bad request !@#$%^&*'})
-    else return res.status(200).json({message: 'bad request !@#$%^&*'})
+    // else return res.status(200).json({message: 'bad request !@#$%^&*'})
     let trade = queryResult.json().alipay_trade_query_response
-    if (trade.trade_status == 'TRADE_SUCCESS') {
-      // 
-      let result = await finishTrade(trade)
-    } else {
-      return res.status(200).json({message: 'bad request !@#$%^&*'})
-    }
-
-    console.log(queryResult.json())
+    await dealWithTrade2(trade)
+    // if (trade.trade_status == 'TRADE_SUCCESS') {
+    //   // 
+    //   let result = await finishTrade(trade)
+    // } else {
+    //   return res.status(200).json({message: 'bad request !@#$%^&*'})
+    // }
 
   // 更新交易信息
   } catch (e) {
@@ -121,8 +120,8 @@ router.get('/trade', async (req, res) => {
     tradeQuery.equalTo('objectId', id)
     let tradeQueryResult = await tradeQuery.find(token(req))
     if (tradeQueryResult.length == 0) throw createErr('trade is not exist')
-    if (tradeQueryResult[0].attributes.status == 'TRADE_SUCCESS')
-      return res.status(200).json(tradeQueryResult[0])
+    // if (tradeQueryResult[0].attributes.status == 'TRADE_SUCCESS')
+      // return res.status(200).json(tradeQueryResult[0])
     // 查询支付宝订单信息
     let trade = await queryTrade(id)
     // 处理订单
@@ -133,30 +132,6 @@ router.get('/trade', async (req, res) => {
     res.status(e.code && e.code > 200? e.code: 500).json({ message: e.message })
   } 
 })
-
-// 订单详情1
-const createTrade = (types, pointIndex) => {
-  let price = 0
-  let points = 0
-  let roles = []
-  let describe = ''
-  //计算会员
-  types.forEach(type => {
-    let obj = typeList.find(item => item.roleName == type)
-    if (obj) price += obj.price
-    roles.push(obj.roleName)
-    describe += '充值会员' + obj.roleName + ' '
-  })
-
-  // 计算点数
-  if (pointIndex !== -1 && pointList[pointIndex]) {
-    points = pointList[pointIndex].count
-    price += pointList[pointIndex].price
-    describe += '充值点数' + points
-  }
-
-  return { price, points, roles, describe, time: 365}
-}
 
 // 订单详情2
 const createTrade2 = (annualCount, pointIndex) => {
@@ -208,43 +183,21 @@ const queryTrade = async id => {
 }
 
 // 处理订单
-const dealWithTrade = async trade => {
-  let { out_trade_no } = trade
-  // 完成订单
-  if (trade.code == '10000' && trade.trade_status == 'TRADE_SUCCESS') {
-    
-    let tradeQuery = new AV.Query('Trade')
-    tradeQuery.equalTo('objectId', out_trade_no)
-    let tradeQueryResult = await tradeQuery.find({useMasterKey: true})
-    let tradeObj = tradeQueryResult[0]
-    let { username, points, roles, describe, time } = tradeObj.attributes
-    let user = await getUserWithRoot(username)
-    // 添加点数
-    await setPoints(user, points)
-    // 添加会员
-    await setRoles(user, roles, time, describe)
-    // 更新订单
-    tradeObj.set('status', 'TRADE_SUCCESS')
-    await tradeObj.save({}, {useMasterKey: true})
-    
-  } else {
-
-  }
-  
-  let tradeObj =  AV.Object.createWithoutData('Trade', out_trade_no)
-  tradeObj
-}
-
-// 处理订单
 const dealWithTrade2 = async trade => {
   let { out_trade_no } = trade
-  // 完成订单
+  // 检查订单
   if (trade.code == '10000' && trade.trade_status == 'TRADE_SUCCESS') {
-    
+    // 获取本地交易记录
     let tradeQuery = new AV.Query('Trade')
     tradeQuery.equalTo('objectId', out_trade_no)
     let tradeQueryResult = await tradeQuery.find({useMasterKey: true})
     let tradeObj = tradeQueryResult[0]
+    console.log(`in deal with trade: ${out_trade_no} status is : ${tradeObj.attributes.status}`)
+    if (tradeObj.attributes.status == 'busy' || tradeObj.attributes.status == 'TRADE_SUCCESS') return
+    // 设置订单状态 ==> busy
+    console.log(`set trade status busy : ${out_trade_no}`)
+    await tradeObj.save({status: 'busy'}, {useMasterKey: true})
+    
     let { username, points, annualCount, roles, describe} = tradeObj.attributes
     let user = await getUserWithRoot(username)
     // 添加点数
@@ -252,6 +205,7 @@ const dealWithTrade2 = async trade => {
     // 添加会员
     await setRoles2(user, annualCount, describe)
     // 更新订单
+    console.log(`finish trade : ${out_trade_no}`)
     tradeObj.set('status', 'TRADE_SUCCESS')
     await tradeObj.save({}, {useMasterKey: true})
     
@@ -259,8 +213,6 @@ const dealWithTrade2 = async trade => {
 
   }
   
-  let tradeObj =  AV.Object.createWithoutData('Trade', out_trade_no)
-  tradeObj
 }
 
 

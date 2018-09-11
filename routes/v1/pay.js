@@ -14,8 +14,8 @@ const gateway = 'https://openapi.alipay.com/gateway.do'
 var ali = new Alipay({
   appId: '2018062760432332',
   notifyUrl: 'http://ciniu.leanapp.cn/pay/notify',
-  rsaPrivate: path.join(__dirname, '../RSA/2.txt'),
-  rsaPublic: path.join(__dirname, '../RSA/3.txt'),
+  rsaPrivate: path.join(__dirname, '../RSA/private_key.txt'),
+  rsaPublic: path.join(__dirname, '../RSA/alipay_public_key.txt'),
   sandbox: false,
   signType: 'RSA2'
 });
