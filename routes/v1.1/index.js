@@ -7,7 +7,13 @@ router.use(AV.Cloud.HttpsRedirect());
 
 router.use('/user', require('./user'))
 
-router.use('/token', require('./sessionToken'))
+router.use('/token', require('./token'))
+
+// router.use('/word', require('./word'))
+
+// router.use('/type', require('./dbType'))
+
+// router.use('/category', require('./category'))
 
 router.use('/ocr', require('./ocr'))
 

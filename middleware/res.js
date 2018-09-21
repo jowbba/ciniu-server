@@ -47,12 +47,10 @@ module.exports = (req, res, next) => {
   }
 
   res.error = (err, status, code) => {
-
     if (typeof err == 'string') err = new Error(err)
-
     status = status || 200
-    code = code || 200
-    let message = !!err.rawMessage? err.rawMessage: err.message
+    code = err.code || code || 200
+    let message = err.rawMessage || err.message
     res.status(status).json({ 
       code, 
       message, 
@@ -61,55 +59,6 @@ module.exports = (req, res, next) => {
     })
   }
 
-  /**
-	* error response
-  * @param {any} error 
-  * @param {number} status - default 403
-  * @param {boolean} loggerFlag - default true
-  */
-  // res.error = (error, status, loggerFlag) => {
-  //   let code, message
-  //   status = status || DEFAULT_ERROR_STATUS
-  //   loggerFlag = loggerFlag === undefined ? true : !!loggerFlag
-  //   if (error) {
-  //     if (error instanceof Error) {
-  //       code = error.code || status
-  //       message = error.message
-  //     }
-  //     // 400
-  //     else if (error instanceof Array) {
-  //       code = 400
-  //       message = httpCode[status]
-  //     }
-  //     // string
-  //     else if (typeof error === 'string') {
-  //       code = status || 403
-  //       message = error
-  //     }
-  //     // others
-  //     else {
-  //       code = error.code || status || 403
-  //       message = error.message || httpCode[status] || 'forbidden'
-  //     }
-  //     // error log
-  //     if (loggerFlag) {
-  //       logger.error({
-  //         method: req.method,
-  //         url: req.originalUrl,
-  //         message: message,
-  //         stack: error.stack
-  //       })
-  //     }
-  //   }
-  //   let response = {
-  //     url: req.originalUrl,
-  //     code: code,
-  //     message: message
-  //   }
-  //   // show stack in production environment
-  //   if (getconfig['env'] === 'production' && loggerFlag) fundebug.notifyError(error)
-  //   debug(`error: ${error}`)
-  //   return res.status(status).json(response)
-  // }
   next()
+
 }

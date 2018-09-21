@@ -89,6 +89,8 @@ app.use('/query', require('./routes/v0/query'))
 
 app.use('/v1.0', require('./routes/v1'))
 
+app.use('/v1.1', require('./routes/v1.1'))
+
 app.use(function(req, res, next) {
   // 如果任何一个路由都没有返回响应，则抛出一个 404 异常给后续的异常处理器
   if (!res.headersSent) {

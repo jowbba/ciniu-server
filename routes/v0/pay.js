@@ -133,6 +133,21 @@ router.get('/trade', async (req, res) => {
   } 
 })
 
+router.get('/test', async (req, res) => {
+  try {
+    let result = await ali.refund({
+      outTradeId: '5b9a10881b69e6005b947454',
+      operatorId: 'admin',
+      refundAmount: '999',
+      refundReason: '测试退款'
+    })
+
+    res.status(200).json(result)
+  } catch (e) {
+    res.status(500).json(e)
+  }
+})
+
 // 订单详情2
 const createTrade2 = (annualCount, pointIndex) => {
   let price = 0
